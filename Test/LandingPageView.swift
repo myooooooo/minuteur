@@ -12,6 +12,7 @@ struct LandingPageView: View {
     @State private var logoBreathing = false
     @State private var buttonPulse = false
     @State private var selectedPage = 0
+    @State private var liveActivityErrorText: String?
 
     private let pages: [(title: String, subtitle: String)] = [
         ("Interface Neon", "Design immersif."),
@@ -156,7 +157,10 @@ struct LandingPageView: View {
     @MainActor
     private func startFocusActivity() async {
         #if canImport(ActivityKit) && os(iOS)
-        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            liveActivityErrorText = "Live Activities disabled."
+            return
+        }
 
         let total = 50 * 60
         let state = FocusFlowAttributes.ContentState(
@@ -167,11 +171,16 @@ struct LandingPageView: View {
             totalSeconds: total
         )
 
-        _ = try? Activity<FocusFlowAttributes>.request(
-            attributes: FocusFlowAttributes(sessionID: UUID()),
-            content: ActivityContent(state: state, staleDate: nil),
-            pushType: nil
-        )
+        do {
+            _ = try Activity<FocusFlowAttributes>.request(
+                attributes: FocusFlowAttributes(sessionID: UUID()),
+                content: ActivityContent(state: state, staleDate: nil),
+                pushType: nil
+            )
+            liveActivityErrorText = nil
+        } catch {
+            liveActivityErrorText = "Activity request failed: \(error.localizedDescription)"
+        }
         #endif
     }
 }

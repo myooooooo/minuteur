@@ -99,9 +99,14 @@ final class AppStateManager: ObservableObject {
     @Published var selectedSoundscape: FocusSoundscape = .cyberRain
     @Published var isStrictFocusModeEnabled: Bool = false
     @Published var totalXP: Int = 0
+    @Published var newlyUnlockedTheme: NeonTheme?
 
     var level: Int {
         max(1, (totalXP / 300) + 1)
+    }
+
+    var totalFocusHours: Int {
+        totalXP / 60
     }
 
     var levelTitle: String {
@@ -162,8 +167,13 @@ final class AppStateManager: ObservableObject {
 
     func addXP(minutes: Int) {
         guard minutes > 0 else { return }
+        let previouslyUnlocked = Set(unlockedThemes)
         totalXP += minutes
         totalXPStorage = totalXP
+
+        let nowUnlocked = Set(unlockedThemes)
+        let newThemes = nowUnlocked.subtracting(previouslyUnlocked)
+        newlyUnlockedTheme = newThemes.sorted { ($0.requiredHours ?? 0) < ($1.requiredHours ?? 0) }.last
 
         // If current selected theme becomes invalid after migration edge cases, fallback.
         if !neonTheme.isUnlocked(totalXP: totalXP) {

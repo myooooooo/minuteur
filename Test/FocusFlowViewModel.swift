@@ -58,6 +58,7 @@ final class FocusFlowViewModel: ObservableObject {
     @Published private(set) var lastCompletedSessionMinutes: Int = 0
     @Published private(set) var earnedFocusMinutes: Int = 0
     @Published private(set) var earnedFocusTrigger: Int = 0
+    @Published private(set) var liveActivityLastError: String?
 
     private var completedWorkSessions: Int = 0
     private let shortBreakMinutes = 5
@@ -73,6 +74,7 @@ final class FocusFlowViewModel: ObservableObject {
     private var timerCancellable: AnyCancellable?
     private var previousRotationAngle: Double?
     private let audioEngine = FocusAudioEngine()
+    private var segmentTargetDate: Date?
 
     var totalSeconds: Int {
         segmentTotalSeconds
@@ -105,6 +107,7 @@ final class FocusFlowViewModel: ObservableObject {
         if currentSegment == .work {
             remainingSeconds = clamped * 60
             segmentTotalSeconds = clamped * 60
+            segmentTargetDate = nil
         }
         rotationCount = min(max((clamped - 1) / 60, 0), 4)
         selectionHapticTrigger += 1
@@ -160,6 +163,7 @@ final class FocusFlowViewModel: ObservableObject {
         currentSegment = .work
         remainingSeconds = selectedMinutes * 60
         segmentTotalSeconds = selectedMinutes * 60
+        segmentTargetDate = nil
         rotationCount = min(max((selectedMinutes - 1) / 60, 0), 4)
 
         #if canImport(ActivityKit) && os(iOS)
@@ -173,12 +177,15 @@ final class FocusFlowViewModel: ObservableObject {
 
     func togglePauseResume() {
         guard phase == .running else { return }
-        isPaused.toggle()
-
         if isPaused {
-            stopSoundIfNeeded()
-        } else {
+            isPaused = false
+            segmentTargetDate = Date().addingTimeInterval(TimeInterval(max(remainingSeconds, 0)))
             startSoundIfNeeded()
+        } else {
+            isPaused = true
+            syncRemainingSecondsFromTargetDate()
+            segmentTargetDate = nil
+            stopSoundIfNeeded()
         }
 
         #if canImport(ActivityKit) && os(iOS)
@@ -219,20 +226,32 @@ final class FocusFlowViewModel: ObservableObject {
 
         Task {
             defer { isStartingLiveActivity = false }
-            guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+            guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+                liveActivityLastError = "ActivityKit disabled by system settings."
+                return
+            }
 
             guard currentActivity == nil else { return }
             try? await Task.sleep(nanoseconds: 1_000_000_000)
             guard currentActivity == nil else { return }
-            let state = makeLiveState(remaining: clamped * 60, total: clamped * 60)
+            let configuredSeconds = clamped * 60
+            let initialRemaining = phase == .running ? remainingSeconds : configuredSeconds
+            let initialTotal = phase == .running ? segmentTotalSeconds : configuredSeconds
+            let state = makeLiveState(
+                remaining: initialRemaining,
+                total: initialTotal,
+                targetDate: liveTargetDate()
+            )
             do {
                 currentActivity = try Activity<FocusFlowAttributes>.request(
                     attributes: FocusFlowAttributes(sessionID: UUID()),
                     content: ActivityContent(state: state, staleDate: nil),
                     pushType: nil
                 )
+                liveActivityLastError = nil
             } catch {
                 currentActivity = nil
+                liveActivityLastError = "Activity request failed: \(error.localizedDescription)"
             }
         }
     }
@@ -241,6 +260,7 @@ final class FocusFlowViewModel: ObservableObject {
     private func beginSegment(_ segment: SegmentType, durationMinutes: Int) {
         currentSegment = segment
         segmentTotalSeconds = max(1, durationMinutes * 60)
+        segmentTargetDate = Date().addingTimeInterval(TimeInterval(segmentTotalSeconds))
         remainingSeconds = segmentTotalSeconds
         isPaused = false
         phase = .running
@@ -275,6 +295,7 @@ final class FocusFlowViewModel: ObservableObject {
             .sink { [weak self] _ in
                 self?.handleTick()
             }
+        handleTick()
     }
 
     private func stopTimer() {
@@ -289,13 +310,11 @@ final class FocusFlowViewModel: ObservableObject {
             return
         }
 
-        if remainingSeconds > 0 {
-            remainingSeconds -= 1
+        let previousRemaining = remainingSeconds
+        syncRemainingSecondsFromTargetDate()
 
-            if isTickHapticsEnabled {
-                secondTickHapticTrigger += 1
-            }
-
+        if remainingSeconds < previousRemaining, isTickHapticsEnabled {
+            secondTickHapticTrigger += 1
         }
 
         if remainingSeconds == 0 {
@@ -341,9 +360,9 @@ final class FocusFlowViewModel: ObservableObject {
     }
 
     #if canImport(ActivityKit) && os(iOS)
-    private func makeLiveState(remaining: Int, total: Int) -> FocusFlowAttributes.ContentState {
+    private func makeLiveState(remaining: Int, total: Int, targetDate: Date) -> FocusFlowAttributes.ContentState {
         FocusFlowAttributes.ContentState(
-            targetDate: Date().addingTimeInterval(TimeInterval(max(remaining, 0))),
+            targetDate: targetDate,
             phaseLabel: currentSegment.label,
             isPaused: isPaused,
             remainingSeconds: max(remaining, 0),
@@ -359,7 +378,11 @@ final class FocusFlowViewModel: ObservableObject {
             return
         }
 
-        let state = makeLiveState(remaining: remainingSeconds, total: segmentTotalSeconds)
+        let state = makeLiveState(
+            remaining: remainingSeconds,
+            total: segmentTotalSeconds,
+            targetDate: liveTargetDate()
+        )
         await currentActivity.update(ActivityContent(state: state, staleDate: nil))
     }
 
@@ -377,14 +400,32 @@ final class FocusFlowViewModel: ObservableObject {
             return
         }
 
-        let finalState = makeLiveState(remaining: 0, total: max(segmentTotalSeconds, 1))
+        let finalState = makeLiveState(
+            remaining: 0,
+            total: max(segmentTotalSeconds, 1),
+            targetDate: Date()
+        )
         await currentActivity.end(
             ActivityContent(state: finalState, staleDate: nil),
             dismissalPolicy: .immediate
         )
         self.currentActivity = nil
     }
+
+    private func liveTargetDate() -> Date {
+        if isPaused {
+            return Date().addingTimeInterval(TimeInterval(max(remainingSeconds, 0)))
+        }
+        return segmentTargetDate ?? Date().addingTimeInterval(TimeInterval(max(remainingSeconds, 0)))
+    }
     #endif
+
+    private func syncRemainingSecondsFromTargetDate() {
+        guard let segmentTargetDate else {
+            return
+        }
+        remainingSeconds = max(Int(ceil(segmentTargetDate.timeIntervalSinceNow)), 0)
+    }
 
     deinit {
         timerCancellable?.cancel()

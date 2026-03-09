@@ -1,26 +1,5 @@
 import SwiftUI
 
-private struct FocusArcShape: Shape {
-    var progress: Double
-
-    func path(in rect: CGRect) -> Path {
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2
-        let start = Angle.degrees(-90)
-        let end = Angle.degrees(-90 + (360 * progress))
-
-        var path = Path()
-        path.addArc(
-            center: center,
-            radius: radius,
-            startAngle: start,
-            endAngle: end,
-            clockwise: false
-        )
-        return path
-    }
-}
-
 struct ContentView: View {
     @StateObject private var viewModel = FocusFlowViewModel()
     @Namespace private var ringNamespace
@@ -181,28 +160,13 @@ struct ContentView: View {
     }
 
     private func ring(progress: Double) -> some View {
-        ZStack {
-            Circle()
-                .stroke(Color.white.opacity(0.08), lineWidth: 24)
-
-            // Custom Path-based progression ring with neon gradient.
-            FocusArcShape(progress: min(max(progress, 0), 1))
-                .stroke(
-                    AngularGradient(
-                        gradient: Gradient(colors: [
-                            Color.cyan,
-                            Color.indigo,
-                            Color.cyan
-                        ]),
-                        center: .center
-                    ),
-                    style: StrokeStyle(lineWidth: 24, lineCap: .round, lineJoin: .round)
-                )
-                .shadow(color: .cyan.opacity(0.6), radius: 6)
-                .shadow(color: .indigo.opacity(0.5), radius: 12)
-                .opacity(viewModel.phase == .running ? (pulse ? 1.0 : 0.52) : 1.0)
-                .animation(.easeInOut(duration: 1.3), value: pulse)
-        }
+        NeonRingView(
+            progress: min(max(progress, 0), 1),
+            colors: [.cyan, .indigo],
+            lineWidth: 24
+        )
+        .opacity(viewModel.phase == .running ? (pulse ? 1.0 : 0.52) : 1.0)
+        .animation(.easeInOut(duration: 1.3), value: pulse)
         .frame(width: 290, height: 290)
     }
 

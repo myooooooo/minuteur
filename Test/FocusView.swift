@@ -217,9 +217,6 @@ struct FocusView: View {
     private func primaryAction() {
         switch viewModel.phase {
         case .setting, .completed:
-            #if canImport(ActivityKit) && os(iOS)
-            viewModel.startLiveActivity(minutes: displayReferenceMinutes)
-            #endif
             viewModel.start()
         case .running:
             viewModel.togglePauseResume()
