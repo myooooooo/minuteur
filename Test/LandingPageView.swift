@@ -7,8 +7,17 @@ import ActivityKit
 #endif
 
 struct LandingPageView: View {
+    @EnvironmentObject var appState: AppStateManager
+
     @State private var logoBreathing = false
     @State private var buttonPulse = false
+    @State private var selectedPage = 0
+
+    private let pages: [(title: String, subtitle: String)] = [
+        ("Interface Neon", "Design immersif."),
+        ("Systeme RPG", "Evoluez a chaque session."),
+        ("Stats Deep", "Analysez vos performances.")
+    ]
 
     var body: some View {
         ZStack {
@@ -27,21 +36,11 @@ struct LandingPageView: View {
             .ignoresSafeArea()
 
             VStack(spacing: 22) {
-                Spacer()
+                Spacer(minLength: 16)
 
-                Group {
-                    if UIImage(named: "FocusLogo") != nil {
-                        Image("FocusLogo")
-                            .resizable()
-                            .scaledToFit()
-                    } else {
-                        Image(systemName: "scope")
-                            .resizable()
-                            .scaledToFit()
-                            .foregroundStyle(.cyan)
-                    }
-                }
-                .frame(width: 110, height: 110)
+                Image(systemName: "timer.circle.fill")
+                .font(.system(size: 98, weight: .regular))
+                .foregroundStyle(.cyan)
                 .shadow(color: .cyan, radius: 20)
                 .scaleEffect(logoBreathing ? 1.06 : 0.94)
                 .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: logoBreathing)
@@ -61,27 +60,23 @@ struct LandingPageView: View {
                         .padding(.horizontal, 18)
                 }
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 14) {
-                        featureCard(
-                            title: "Interface Neon",
-                            subtitle: "Design immersif."
-                        )
-                        featureCard(
-                            title: "Systeme RPG",
-                            subtitle: "Evoluez a chaque session."
-                        )
-                        featureCard(
-                            title: "Stats Deep",
-                            subtitle: "Analysez vos performances."
-                        )
+                TabView(selection: $selectedPage) {
+                    ForEach(Array(pages.enumerated()), id: \.offset) { index, page in
+                        onboardingPage(title: page.title, subtitle: page.subtitle)
+                            .tag(index)
                     }
-                    .padding(.horizontal, 20)
                 }
+                .tabViewStyle(.page(indexDisplayMode: .always))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .indexViewStyle(.page(backgroundDisplayMode: .always))
 
                 Spacer(minLength: 10)
 
                 Button {
+                    withAnimation(.easeInOut(duration: 0.35)) {
+                        appState.hasCompletedOnboarding = true
+                    }
+                    appState.completeOnboarding()
                     Task {
                         await startFocusActivity()
                     }
@@ -113,23 +108,31 @@ struct LandingPageView: View {
         }
     }
 
-    private func featureCard(title: String, subtitle: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func onboardingPage(title: String, subtitle: String) -> some View {
+        VStack(spacing: 14) {
+            Spacer()
+
             Text(title)
-                .font(.system(size: 15, weight: .semibold, design: .monospaced))
+                .font(.system(size: 32, weight: .black, design: .monospaced))
                 .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
 
             Text(subtitle)
-                .font(.system(size: 13, weight: .regular, design: .rounded))
+                .font(.system(size: 18, weight: .medium, design: .rounded))
                 .foregroundStyle(.white.opacity(0.78))
+                .multilineTextAlignment(.center)
+
+            Spacer()
         }
-        .frame(width: 185, height: 100, alignment: .leading)
-        .padding(14)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 24)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
         )
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
     }
 
     @MainActor
