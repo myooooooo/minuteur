@@ -126,4 +126,10 @@ struct IslandView: Widget {
         return String(format: "%d:%02d", hours, mins)
     }
 }
+
+#Preview(as: .dynamicIsland(.expanded), using: FocusFlowAttributes.preview) {
+    IslandView()
+} contentStates: {
+    FocusFlowAttributes.ContentState.preview
+}
 #endif
