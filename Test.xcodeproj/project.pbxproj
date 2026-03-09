@@ -8,11 +8,41 @@
 
 /* Begin PBXBuildFile section */
 		3EEEF8B92F5ED37000C7E671 /* force_commit_debug.sh in Resources */ = {isa = PBXBuildFile; fileRef = 3EEEF8B82F5ED37000C7E671 /* force_commit_debug.sh */; };
+		3EEEF8C32F5ED9B500C7E671 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3EEEF8C22F5ED9B500C7E671 /* WidgetKit.framework */; };
+		3EEEF8C52F5ED9B500C7E671 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3EEEF8C42F5ED9B500C7E671 /* SwiftUI.framework */; };
+		3EEEF8D62F5ED9B700C7E671 /* FocusIslandExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3EEEF8C02F5ED9B500C7E671 /* FocusIslandExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		3EEEF8D42F5ED9B700C7E671 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 3E6FDD9A2F5B05F10048B6DF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3EEEF8BF2F5ED9B500C7E671;
+			remoteInfo = FocusIslandExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		3EEEF8DB2F5ED9B700C7E671 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				3EEEF8D62F5ED9B700C7E671 /* FocusIslandExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		3E6FDDA22F5B05F10048B6DF /* Test.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Test.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3EEEF8B82F5ED37000C7E671 /* force_commit_debug.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = force_commit_debug.sh; sourceTree = "<group>"; };
+		3EEEF8C02F5ED9B500C7E671 /* FocusIslandExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = FocusIslandExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		3EEEF8C22F5ED9B500C7E671 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		3EEEF8C42F5ED9B500C7E671 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -23,6 +53,21 @@
 			);
 			target = 3E6FDDA12F5B05F10048B6DF /* Test */;
 		};
+		3EEEF8DA2F5ED9B700C7E671 /* Exceptions for "FocusIsland" folder in "FocusIslandExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 3EEEF8BF2F5ED9B500C7E671 /* FocusIslandExtension */;
+		};
+		3EEEF8DD2F5ED9C600C7E671 /* Exceptions for "Test" folder in "FocusIslandExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				FocusFlowAttributes.swift,
+				IslandView.swift,
+			);
+			target = 3EEEF8BF2F5ED9B500C7E671 /* FocusIslandExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -30,8 +75,17 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				3E6FDDBF2F5B26090048B6DF /* Exceptions for "Test" folder in "Test" target */,
+				3EEEF8DD2F5ED9C600C7E671 /* Exceptions for "Test" folder in "FocusIslandExtension" target */,
 			);
 			path = Test;
+			sourceTree = "<group>";
+		};
+		3EEEF8C62F5ED9B600C7E671 /* FocusIsland */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				3EEEF8DA2F5ED9B700C7E671 /* Exceptions for "FocusIsland" folder in "FocusIslandExtension" target */,
+			);
+			path = FocusIsland;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -44,6 +98,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		3EEEF8BD2F5ED9B500C7E671 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3EEEF8C52F5ED9B500C7E671 /* SwiftUI.framework in Frameworks */,
+				3EEEF8C32F5ED9B500C7E671 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -51,6 +114,8 @@
 			isa = PBXGroup;
 			children = (
 				3E6FDDA42F5B05F10048B6DF /* Test */,
+				3EEEF8C62F5ED9B600C7E671 /* FocusIsland */,
+				3EEEF8C12F5ED9B500C7E671 /* Frameworks */,
 				3E6FDDA32F5B05F10048B6DF /* Products */,
 				3EEEF8B82F5ED37000C7E671 /* force_commit_debug.sh */,
 			);
@@ -60,8 +125,18 @@
 			isa = PBXGroup;
 			children = (
 				3E6FDDA22F5B05F10048B6DF /* Test.app */,
+				3EEEF8C02F5ED9B500C7E671 /* FocusIslandExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		3EEEF8C12F5ED9B500C7E671 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				3EEEF8C22F5ED9B500C7E671 /* WidgetKit.framework */,
+				3EEEF8C42F5ED9B500C7E671 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -74,10 +149,12 @@
 				3E6FDD9E2F5B05F10048B6DF /* Sources */,
 				3E6FDD9F2F5B05F10048B6DF /* Frameworks */,
 				3E6FDDA02F5B05F10048B6DF /* Resources */,
+				3EEEF8DB2F5ED9B700C7E671 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				3EEEF8D52F5ED9B700C7E671 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				3E6FDDA42F5B05F10048B6DF /* Test */,
@@ -88,6 +165,28 @@
 			productName = Test;
 			productReference = 3E6FDDA22F5B05F10048B6DF /* Test.app */;
 			productType = "com.apple.product-type.application";
+		};
+		3EEEF8BF2F5ED9B500C7E671 /* FocusIslandExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3EEEF8D72F5ED9B700C7E671 /* Build configuration list for PBXNativeTarget "FocusIslandExtension" */;
+			buildPhases = (
+				3EEEF8BC2F5ED9B500C7E671 /* Sources */,
+				3EEEF8BD2F5ED9B500C7E671 /* Frameworks */,
+				3EEEF8BE2F5ED9B500C7E671 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				3EEEF8C62F5ED9B600C7E671 /* FocusIsland */,
+			);
+			name = FocusIslandExtension;
+			packageProductDependencies = (
+			);
+			productName = FocusIslandExtension;
+			productReference = 3EEEF8C02F5ED9B500C7E671 /* FocusIslandExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -100,6 +199,9 @@
 				LastUpgradeCheck = 2630;
 				TargetAttributes = {
 					3E6FDDA12F5B05F10048B6DF = {
+						CreatedOnToolsVersion = 26.3;
+					};
+					3EEEF8BF2F5ED9B500C7E671 = {
 						CreatedOnToolsVersion = 26.3;
 					};
 				};
@@ -119,6 +221,7 @@
 			projectRoot = "";
 			targets = (
 				3E6FDDA12F5B05F10048B6DF /* Test */,
+				3EEEF8BF2F5ED9B500C7E671 /* FocusIslandExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -132,6 +235,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		3EEEF8BE2F5ED9B500C7E671 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -142,7 +252,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		3EEEF8BC2F5ED9B500C7E671 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		3EEEF8D52F5ED9B700C7E671 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 3EEEF8BF2F5ED9B500C7E671 /* FocusIslandExtension */;
+			targetProxy = 3EEEF8D42F5ED9B700C7E671 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		3E6FDDAB2F5B05F20048B6DF /* Debug */ = {
@@ -347,6 +472,69 @@
 			};
 			name = Release;
 		};
+		3EEEF8D82F5ED9B700C7E671 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FocusIsland/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = FocusIsland;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = zineb.Test.FocusIsland;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		3EEEF8D92F5ED9B700C7E671 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = FocusIsland/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = FocusIsland;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = zineb.Test.FocusIsland;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -364,6 +552,15 @@
 			buildConfigurations = (
 				3E6FDDAE2F5B05F20048B6DF /* Debug */,
 				3E6FDDAF2F5B05F20048B6DF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3EEEF8D72F5ED9B700C7E671 /* Build configuration list for PBXNativeTarget "FocusIslandExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				3EEEF8D82F5ED9B700C7E671 /* Debug */,
+				3EEEF8D92F5ED9B700C7E671 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
