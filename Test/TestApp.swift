@@ -3,15 +3,16 @@ import SwiftUI
 @main
 struct FocusFlowApp: App {
     @StateObject private var appState = AppStateManager()
+    @Namespace private var entryNamespace
 
     var body: some Scene {
         WindowGroup {
             Group {
                 if appState.hasCompletedOnboarding {
-                    MainTabView()
+                    MainTabView(entryNamespace: entryNamespace)
                         .transition(.opacity)
                 } else {
-                    LandingPageView()
+                    OnboardingView(entryNamespace: entryNamespace)
                         .transition(.opacity)
                 }
             }

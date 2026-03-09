@@ -2,8 +2,10 @@ import SwiftUI
 
 struct MainTabView: View {
     @EnvironmentObject var appState: AppStateManager
+    let entryNamespace: Namespace.ID?
 
-    init() {
+    init(entryNamespace: Namespace.ID? = nil) {
+        self.entryNamespace = entryNamespace
         UITabBar.appearance().barStyle = .black
     }
 
@@ -29,10 +31,19 @@ struct MainTabView: View {
         }
         .tint(appState.neonTheme.accentColor)
         .preferredColorScheme(.dark)
+        .overlay(alignment: .bottom) {
+            if let entryNamespace {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(appState.neonTheme.accentColor)
+                    .frame(width: 1, height: 1)
+                    .opacity(0.001)
+                    .matchedGeometryEffect(id: "entry.accent", in: entryNamespace)
+            }
+        }
     }
 }
 
 #Preview {
-    MainTabView()
+    MainTabView(entryNamespace: nil)
         .environmentObject(AppStateManager())
 }
