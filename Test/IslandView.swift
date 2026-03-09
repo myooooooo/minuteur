@@ -100,9 +100,7 @@ struct IslandView: Widget {
                     VStack(spacing: 12) {
                         ProgressView(value: progressValue(for: context.state))
                             .progressViewStyle(.linear)
-                            .tint(
-                                LinearGradient(colors: [.cyan, .indigo], startPoint: .leading, endPoint: .trailing)
-                            )
+                            .tint(.cyan)
 
                         HStack(spacing: 18) {
                             Button(intent: TogglePauseIntent()) {
@@ -119,7 +117,7 @@ struct IslandView: Widget {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .top)
-                    .frame(height: 100, alignment: .top)
+                    .frame(height: 80, alignment: .top)
                 }
             } compactLeading: {
                 Image(systemName: "timer.circle.fill")

@@ -26,7 +26,7 @@ struct ContentView: View {
     @Namespace private var ringNamespace
 
     @State private var pulse = false
-    @State private var isReady = false
+    @State private var isVisible = false
 
     // Daily persistence with AppStorage as requested.
     @AppStorage("focusflow.totalMinutesToday") private var totalMinutesToday = 0
@@ -62,8 +62,8 @@ struct ContentView: View {
         }
         .onAppear {
             syncDailyStorageIfNeeded()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                isReady = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                isVisible = true
             }
         }
         .onChange(of: viewModel.sessionCompletionTrigger) { _, _ in
@@ -96,7 +96,7 @@ struct ContentView: View {
 
     private var settingMode: some View {
         VStack(spacing: 26) {
-            if isReady {
+            if isVisible {
                 ring(progress: Double(viewModel.selectedMinutes) / 60)
                     .matchedGeometryEffect(id: "focus-ring", in: ringNamespace)
                     .overlay {
@@ -139,7 +139,7 @@ struct ContentView: View {
 
     private var runningMode: some View {
         VStack(spacing: 24) {
-            if isReady {
+            if isVisible {
                 ring(progress: viewModel.progress)
                     .matchedGeometryEffect(id: "focus-ring", in: ringNamespace)
                     .overlay {
@@ -198,8 +198,8 @@ struct ContentView: View {
                     ),
                     style: StrokeStyle(lineWidth: 24, lineCap: .round, lineJoin: .round)
                 )
-                .shadow(color: .cyan.opacity(0.6), radius: 12)
-                .shadow(color: .indigo.opacity(0.5), radius: 24)
+                .shadow(color: .cyan.opacity(0.6), radius: 6)
+                .shadow(color: .indigo.opacity(0.5), radius: 12)
                 .opacity(viewModel.phase == .running ? (pulse ? 1.0 : 0.52) : 1.0)
                 .animation(.easeInOut(duration: 1.3), value: pulse)
         }

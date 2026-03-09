@@ -5,7 +5,7 @@ struct NeonCircle: View {
         Circle()
             .stroke(lineWidth: 5)
             .foregroundStyle(.cyan)
-            .shadow(color: .cyan, radius: 10)
+            .shadow(color: .cyan, radius: 5)
             .drawingGroup() // Isole ici uniquement
     }
 }
@@ -32,7 +32,7 @@ struct NeonRingView: View {
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
                 )
                 .rotationEffect(.degrees(-90))
-                .shadow(color: colors[0].opacity(0.7), radius: 10, x: 0, y: 0)
+                .shadow(color: colors[0].opacity(0.7), radius: 5, x: 0, y: 0)
         }
         .frame(width: 250, height: 250)
         // Isolated GPU rasterization point.

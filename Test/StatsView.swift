@@ -156,7 +156,7 @@ struct StatsView: View {
                             lineWidth: 1.2
                         )
                 )
-                .shadow(color: .cyan.opacity(0.2), radius: 8)
+                .shadow(color: .cyan.opacity(0.2), radius: 4)
         )
     }
 
@@ -187,7 +187,7 @@ struct StatsView: View {
                             lineWidth: 1.2
                         )
                 )
-                .shadow(color: .cyan.opacity(0.25), radius: 8)
+                .shadow(color: .cyan.opacity(0.25), radius: 4)
         )
     }
 

@@ -65,6 +65,8 @@ final class FocusFlowViewModel: ObservableObject {
 
     #if canImport(ActivityKit) && os(iOS)
     @Published var currentActivity: Activity<FocusFlowAttributes>? = nil
+    private var liveActivityStartTask: Task<Void, Never>?
+    private var isStartingLiveActivity = false
 
     #endif
 
@@ -161,6 +163,8 @@ final class FocusFlowViewModel: ObservableObject {
         rotationCount = min(max((selectedMinutes - 1) / 60, 0), 4)
 
         #if canImport(ActivityKit) && os(iOS)
+        liveActivityStartTask?.cancel()
+        liveActivityStartTask = nil
         Task {
             await endLiveActivity()
         }
@@ -205,24 +209,29 @@ final class FocusFlowViewModel: ObservableObject {
     func startLiveActivity(minutes: Int) {
         let clamped = min(max(minutes, 1), 300)
 
+        if currentActivity != nil {
+            Task { await refreshLiveActivityState() }
+            return
+        }
+
+        guard !isStartingLiveActivity else { return }
+        isStartingLiveActivity = true
+
         Task {
+            defer { isStartingLiveActivity = false }
             guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
 
-            if currentActivity == nil {
-                let state = makeLiveState(remaining: clamped * 60, total: clamped * 60)
-                do {
-                    currentActivity = try Activity<FocusFlowAttributes>.request(
-                        attributes: FocusFlowAttributes(sessionID: UUID()),
-                        content: ActivityContent(state: state, staleDate: nil),
-                        pushType: nil
-                    )
-                } catch {
-                    currentActivity = nil
-                }
-                return
+            guard currentActivity == nil else { return }
+            let state = makeLiveState(remaining: clamped * 60, total: clamped * 60)
+            do {
+                currentActivity = try Activity<FocusFlowAttributes>.request(
+                    attributes: FocusFlowAttributes(sessionID: UUID()),
+                    content: ActivityContent(state: state, staleDate: nil),
+                    pushType: nil
+                )
+            } catch {
+                currentActivity = nil
             }
-
-            await refreshLiveActivityState()
         }
     }
     #endif
@@ -238,12 +247,17 @@ final class FocusFlowViewModel: ObservableObject {
         startSoundIfNeeded()
 
         #if canImport(ActivityKit) && os(iOS)
-        Task {
-            if currentActivity == nil {
-                try? await Task.sleep(nanoseconds: 800_000_000)
+        liveActivityStartTask?.cancel()
+        if currentActivity == nil {
+            liveActivityStartTask = Task {
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                guard !Task.isCancelled else { return }
                 guard phase == .running else { return }
                 startLiveActivity(minutes: durationMinutes)
-            } else {
+                liveActivityStartTask = nil
+            }
+        } else {
+            Task {
                 await refreshLiveActivityState()
             }
         }
