@@ -9,10 +9,13 @@ struct FocusFlowApp: App {
             Group {
                 if appState.hasCompletedOnboarding {
                     MainTabView()
+                        .transition(.opacity)
                 } else {
-                    OnboardingView()
+                    LandingPageView()
+                        .transition(.opacity)
                 }
             }
+            .animation(.easeInOut(duration: 0.35), value: appState.hasCompletedOnboarding)
             .environmentObject(appState)
         }
     }
