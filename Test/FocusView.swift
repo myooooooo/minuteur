@@ -15,7 +15,7 @@ struct FocusView: View {
     @State private var accumulatedDragAngle: Double = 0
     @State private var gestureStartMinutes: Int = 50
 
-    private let ringSize: CGFloat = 300
+    private let ringSize: CGFloat = 250
     private let ringLineWidth: CGFloat = 8
 
     var body: some View {

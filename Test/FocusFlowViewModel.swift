@@ -66,8 +66,6 @@ final class FocusFlowViewModel: ObservableObject {
     #if canImport(ActivityKit) && os(iOS)
     @Published var currentActivity: Activity<FocusFlowAttributes>? = nil
 
-    private var lastLiveActivityMaintenanceAt: Date = .distantPast
-    private let liveActivityMaintenanceInterval: TimeInterval = 10
     #endif
 
     private var timerCancellable: AnyCancellable?
@@ -181,7 +179,7 @@ final class FocusFlowViewModel: ObservableObject {
 
         #if canImport(ActivityKit) && os(iOS)
         Task {
-            await refreshLiveActivityState(force: true)
+            await refreshLiveActivityState()
         }
         #endif
     }
@@ -218,14 +216,13 @@ final class FocusFlowViewModel: ObservableObject {
                         content: ActivityContent(state: state, staleDate: nil),
                         pushType: nil
                     )
-                    lastLiveActivityMaintenanceAt = Date()
                 } catch {
                     currentActivity = nil
                 }
                 return
             }
 
-            await refreshLiveActivityState(force: true)
+            await refreshLiveActivityState()
         }
     }
     #endif
@@ -245,7 +242,7 @@ final class FocusFlowViewModel: ObservableObject {
             if currentActivity == nil {
                 startLiveActivity(minutes: durationMinutes)
             } else {
-                await refreshLiveActivityState(force: true)
+                await refreshLiveActivityState()
             }
         }
         #endif
@@ -271,9 +268,6 @@ final class FocusFlowViewModel: ObservableObject {
         guard phase == .running else { return }
 
         if isPaused {
-            #if canImport(ActivityKit) && os(iOS)
-            Task { await performLiveActivityMaintenanceIfNeeded() }
-            #endif
             return
         }
 
@@ -284,9 +278,6 @@ final class FocusFlowViewModel: ObservableObject {
                 secondTickHapticTrigger += 1
             }
 
-            #if canImport(ActivityKit) && os(iOS)
-            Task { await performLiveActivityMaintenanceIfNeeded() }
-            #endif
         }
 
         if remainingSeconds == 0 {
@@ -342,7 +333,7 @@ final class FocusFlowViewModel: ObservableObject {
         )
     }
 
-    private func refreshLiveActivityState(force: Bool) async {
+    private func refreshLiveActivityState() async {
         guard let currentActivity else { return }
 
         guard isActivityValid(currentActivity) else {
@@ -350,18 +341,8 @@ final class FocusFlowViewModel: ObservableObject {
             return
         }
 
-        let now = Date()
-        if !force && now.timeIntervalSince(lastLiveActivityMaintenanceAt) < liveActivityMaintenanceInterval {
-            return
-        }
-
-        lastLiveActivityMaintenanceAt = now
         let state = makeLiveState(remaining: remainingSeconds, total: segmentTotalSeconds)
         await currentActivity.update(ActivityContent(state: state, staleDate: nil))
-    }
-
-    private func performLiveActivityMaintenanceIfNeeded() async {
-        await refreshLiveActivityState(force: false)
     }
 
     private func isActivityValid(_ activity: Activity<FocusFlowAttributes>) -> Bool {

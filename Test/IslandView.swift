@@ -95,54 +95,38 @@ struct IslandView: Widget {
                 }
 
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(spacing: 10) {
+                    VStack(spacing: 12) {
                         ProgressView(value: progressValue(for: context.state))
                             .progressViewStyle(.linear)
                             .tint(
                                 LinearGradient(colors: [.cyan, .indigo], startPoint: .leading, endPoint: .trailing)
                             )
 
-                        HStack(spacing: 8) {
+                        HStack(spacing: 18) {
                             Button(intent: TogglePauseIntent()) {
-                                Text(context.state.isPaused ? "Reprendre" : "Pause")
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background(
-                                        Capsule()
-                                            .fill(Color.black)
-                                            .overlay(Capsule().stroke(Color.cyan, lineWidth: 1.5))
-                                    )
+                                Image(systemName: context.state.isPaused ? "play.fill" : "pause.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.cyan)
                             }
-                            .buttonStyle(.plain)
 
                             Button(intent: StopFocusIntent()) {
-                                Text("Stop")
-                                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background(
-                                        Capsule()
-                                            .fill(Color.black)
-                                            .overlay(Capsule().stroke(Color.red, lineWidth: 1.5))
-                                    )
+                                Image(systemName: "stop.fill")
+                                    .font(.title3)
+                                    .foregroundColor(.red)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
-                    .frame(maxWidth: .infinity, minHeight: 72, maxHeight: 92, alignment: .top)
+                    .frame(maxWidth: .infinity, alignment: .top)
+                    .frame(height: 160, alignment: .top)
                 }
             } compactLeading: {
-                Image(systemName: "timer")
+                Image(systemName: "timer.circle.fill")
                     .foregroundColor(.cyan)
-                    .font(.title3)
             } compactTrailing: {
                 Text(timerInterval: Date()...context.state.targetDate, countsDown: true)
                     .monospacedDigit()
                     .foregroundColor(.cyan)
-                    .frame(width: 50)
+                    .frame(width: 45)
             } minimal: {
                 Image(systemName: "timer")
                     .foregroundColor(.cyan)
