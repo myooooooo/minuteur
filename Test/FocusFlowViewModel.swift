@@ -200,7 +200,7 @@ final class FocusFlowViewModel: ObservableObject {
     func setSoundscape(_ soundscape: FocusSoundscape) {
         selectedSoundscape = soundscape
         if isSoundEnabled && isRunningActive {
-            audioEngine.play(soundscape: soundscape)
+            // audioEngine.play(soundscape: soundscape)
         }
     }
 
@@ -221,6 +221,8 @@ final class FocusFlowViewModel: ObservableObject {
             defer { isStartingLiveActivity = false }
             guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
 
+            guard currentActivity == nil else { return }
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
             guard currentActivity == nil else { return }
             let state = makeLiveState(remaining: clamped * 60, total: clamped * 60)
             do {
@@ -325,7 +327,7 @@ final class FocusFlowViewModel: ObservableObject {
 
     private func startSoundIfNeeded() {
         guard isSoundEnabled, isRunningActive else { return }
-        audioEngine.play(soundscape: selectedSoundscape)
+        // audioEngine.play(soundscape: selectedSoundscape)
     }
 
     private func stopSoundIfNeeded() {

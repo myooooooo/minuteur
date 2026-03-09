@@ -6,8 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		3EEEF8B92F5ED37000C7E671 /* force_commit_debug.sh in Resources */ = {isa = PBXBuildFile; fileRef = 3EEEF8B82F5ED37000C7E671 /* force_commit_debug.sh */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		3E6FDDA22F5B05F10048B6DF /* Test.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Test.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3EEEF8B82F5ED37000C7E671 /* force_commit_debug.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = force_commit_debug.sh; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -47,6 +52,7 @@
 			children = (
 				3E6FDDA42F5B05F10048B6DF /* Test */,
 				3E6FDDA32F5B05F10048B6DF /* Products */,
+				3EEEF8B82F5ED37000C7E671 /* force_commit_debug.sh */,
 			);
 			sourceTree = "<group>";
 		};
@@ -122,6 +128,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3EEEF8B92F5ED37000C7E671 /* force_commit_debug.sh in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

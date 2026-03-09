@@ -78,58 +78,21 @@ struct IslandView: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Image(systemName: "timer")
-                            .foregroundColor(.cyan)
-                        Text(context.state.phaseLabel)
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                    }
-                    .frame(width: 70, height: 72, alignment: .leading)
+                    Text("Test")
                 }
 
                 DynamicIslandExpandedRegion(.trailing) {
-                    trailingTimeText(for: context.state)
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.65)
-                        .frame(width: 120, height: 72, alignment: .trailing)
                 }
 
                 DynamicIslandExpandedRegion(.bottom) {
-                    VStack(spacing: 12) {
-                        ProgressView(value: progressValue(for: context.state))
-                            .progressViewStyle(.linear)
-                            .tint(.cyan)
-
-                        HStack(spacing: 18) {
-                            Button(intent: TogglePauseIntent()) {
-                                Image(systemName: context.state.isPaused ? "play.fill" : "pause.fill")
-                                    .font(.title3)
-                                    .foregroundColor(.cyan)
-                            }
-
-                            Button(intent: StopFocusIntent()) {
-                                Image(systemName: "stop.fill")
-                                    .font(.title3)
-                                    .foregroundColor(.red)
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .top)
-                    .frame(height: 80, alignment: .top)
                 }
             } compactLeading: {
-                Image(systemName: "timer.circle.fill")
-                    .foregroundColor(.cyan)
+                Text("L")
             } compactTrailing: {
-                Text(timerInterval: Date()...context.state.targetDate, countsDown: true)
-                    .monospacedDigit()
-                    .foregroundColor(.cyan)
+                Text("T")
                     .frame(width: 45)
             } minimal: {
-                Image(systemName: "timer")
-                    .foregroundColor(.cyan)
+                Text("M")
             }
         }
     }
