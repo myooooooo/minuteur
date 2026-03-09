@@ -2,10 +2,11 @@ import SwiftUI
 #if canImport(UIKit)
 import UIKit
 #endif
+#if canImport(ActivityKit) && os(iOS)
+import ActivityKit
+#endif
 
 struct LandingPageView: View {
-    @EnvironmentObject var appState: AppStateManager
-
     @State private var logoBreathing = false
     @State private var buttonPulse = false
 
@@ -25,8 +26,8 @@ struct LandingPageView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 24) {
-                Spacer(minLength: 20)
+            VStack(spacing: 22) {
+                Spacer()
 
                 Group {
                     if UIImage(named: "FocusLogo") != nil {
@@ -40,7 +41,8 @@ struct LandingPageView: View {
                             .foregroundStyle(.cyan)
                     }
                 }
-                .frame(width: 96, height: 96)
+                .frame(width: 110, height: 110)
+                .shadow(color: .cyan, radius: 20)
                 .scaleEffect(logoBreathing ? 1.06 : 0.94)
                 .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: logoBreathing)
 
@@ -77,15 +79,14 @@ struct LandingPageView: View {
                     .padding(.horizontal, 20)
                 }
 
-                Spacer()
+                Spacer(minLength: 10)
 
                 Button {
-                    withAnimation(.spring(response: 0.45, dampingFraction: 0.88)) {
-                        appState.selectedTab = .focus
-                        appState.completeOnboarding()
+                    Task {
+                        await startFocusActivity()
                     }
                 } label: {
-                    Text("COMMENCER")
+                    Text("DÉMARRER LE FOCUS")
                         .font(.system(size: 18, weight: .bold, design: .monospaced))
                         .foregroundStyle(.cyan)
                         .frame(maxWidth: .infinity)
@@ -129,6 +130,28 @@ struct LandingPageView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(Color.white.opacity(0.2), lineWidth: 1)
         )
+    }
+
+    @MainActor
+    private func startFocusActivity() async {
+        #if canImport(ActivityKit) && os(iOS)
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+
+        let total = 50 * 60
+        let state = FocusFlowAttributes.ContentState(
+            targetDate: Date().addingTimeInterval(TimeInterval(total)),
+            phaseLabel: "TRAVAIL",
+            isPaused: false,
+            remainingSeconds: total,
+            totalSeconds: total
+        )
+
+        _ = try? Activity<FocusFlowAttributes>.request(
+            attributes: FocusFlowAttributes(sessionID: UUID()),
+            content: ActivityContent(state: state, staleDate: nil),
+            pushType: nil
+        )
+        #endif
     }
 }
 
