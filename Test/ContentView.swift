@@ -26,6 +26,7 @@ struct ContentView: View {
     @Namespace private var ringNamespace
 
     @State private var pulse = false
+    @State private var isReady = false
 
     // Daily persistence with AppStorage as requested.
     @AppStorage("focusflow.totalMinutesToday") private var totalMinutesToday = 0
@@ -61,6 +62,9 @@ struct ContentView: View {
         }
         .onAppear {
             syncDailyStorageIfNeeded()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isReady = true
+            }
         }
         .onChange(of: viewModel.sessionCompletionTrigger) { _, _ in
             syncDailyStorageIfNeeded()
@@ -92,27 +96,29 @@ struct ContentView: View {
 
     private var settingMode: some View {
         VStack(spacing: 26) {
-            ring(progress: Double(viewModel.selectedMinutes) / 60)
-                .matchedGeometryEffect(id: "focus-ring", in: ringNamespace)
-                .overlay {
-                    VStack(spacing: 6) {
-                        Text("Durée")
-                            .foregroundStyle(.white.opacity(0.62))
-                        Text("\(viewModel.selectedMinutes)")
-                            .font(.system(size: 56, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .contentTransition(.numericText())
-                        Text("minutes")
-                            .foregroundStyle(.white.opacity(0.62))
-                    }
-                }
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            let minutes = minutesForDrag(location: value.location, in: CGSize(width: 290, height: 290))
-                            viewModel.setMinutesFromDrag(minutes)
+            if isReady {
+                ring(progress: Double(viewModel.selectedMinutes) / 60)
+                    .matchedGeometryEffect(id: "focus-ring", in: ringNamespace)
+                    .overlay {
+                        VStack(spacing: 6) {
+                            Text("Durée")
+                                .foregroundStyle(.white.opacity(0.62))
+                            Text("\(viewModel.selectedMinutes)")
+                                .font(.system(size: 56, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .contentTransition(.numericText())
+                            Text("minutes")
+                                .foregroundStyle(.white.opacity(0.62))
                         }
-                )
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                let minutes = minutesForDrag(location: value.location, in: CGSize(width: 290, height: 290))
+                                viewModel.setMinutesFromDrag(minutes)
+                            }
+                    )
+            }
 
             Button {
                 viewModel.start()
@@ -133,19 +139,21 @@ struct ContentView: View {
 
     private var runningMode: some View {
         VStack(spacing: 24) {
-            ring(progress: viewModel.progress)
-                .matchedGeometryEffect(id: "focus-ring", in: ringNamespace)
-                .overlay {
-                    VStack(spacing: 8) {
-                        Text(viewModel.timeDisplay)
-                            .font(.system(size: 56, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .contentTransition(.numericText())
+            if isReady {
+                ring(progress: viewModel.progress)
+                    .matchedGeometryEffect(id: "focus-ring", in: ringNamespace)
+                    .overlay {
+                        VStack(spacing: 8) {
+                            Text(viewModel.timeDisplay)
+                                .font(.system(size: 56, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .contentTransition(.numericText())
 
-                        Text(viewModel.phase == .completed ? "Session terminée" : "En cours")
-                            .foregroundStyle(.white.opacity(0.68))
+                            Text(viewModel.phase == .completed ? "Session terminée" : "En cours")
+                                .foregroundStyle(.white.opacity(0.68))
+                        }
                     }
-                }
+            }
 
             Button {
                 viewModel.reset()

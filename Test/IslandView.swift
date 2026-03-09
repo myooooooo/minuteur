@@ -8,6 +8,7 @@ import AppIntents
 struct TogglePauseIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Pause/Reprise"
 
+    @MainActor
     func perform() async throws -> some IntentResult {
         for activity in Activity<FocusFlowAttributes>.activities {
             let wasPaused = activity.content.state.isPaused
@@ -31,6 +32,7 @@ struct TogglePauseIntent: LiveActivityIntent {
 struct StopFocusIntent: LiveActivityIntent {
     static let title: LocalizedStringResource = "Arrêter le chrono"
 
+    @MainActor
     func perform() async throws -> some IntentResult {
         for activity in Activity<FocusFlowAttributes>.activities {
             let finalState = FocusFlowAttributes.ContentState(
@@ -117,7 +119,7 @@ struct IslandView: Widget {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .top)
-                    .frame(height: 160, alignment: .top)
+                    .frame(height: 100, alignment: .top)
                 }
             } compactLeading: {
                 Image(systemName: "timer.circle.fill")

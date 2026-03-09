@@ -240,6 +240,8 @@ final class FocusFlowViewModel: ObservableObject {
         #if canImport(ActivityKit) && os(iOS)
         Task {
             if currentActivity == nil {
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                guard phase == .running else { return }
                 startLiveActivity(minutes: durationMinutes)
             } else {
                 await refreshLiveActivityState()
