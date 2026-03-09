@@ -1,5 +1,15 @@
 import SwiftUI
 
+struct NeonCircle: View {
+    var body: some View {
+        Circle()
+            .stroke(lineWidth: 5)
+            .foregroundStyle(.cyan)
+            .shadow(color: .cyan, radius: 10)
+            .drawingGroup() // Isole ici uniquement
+    }
+}
+
 struct NeonRingView: View {
     let progress: Double
     let colors: [Color]
@@ -24,7 +34,7 @@ struct NeonRingView: View {
                 .rotationEffect(.degrees(-90))
                 .shadow(color: colors[0].opacity(0.7), radius: 10, x: 0, y: 0)
         }
-        // Only authorized Metal rasterization point.
+        // Isolated GPU rasterization point.
         .drawingGroup()
     }
 }

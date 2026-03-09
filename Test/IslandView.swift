@@ -135,13 +135,14 @@ struct IslandView: Widget {
                     .frame(maxWidth: .infinity, minHeight: 72, maxHeight: 92, alignment: .top)
                 }
             } compactLeading: {
-                Image(systemName: "timer.circle.fill")
+                Image(systemName: "timer")
                     .foregroundColor(.cyan)
+                    .font(.title3)
             } compactTrailing: {
                 Text(timerInterval: Date()...context.state.targetDate, countsDown: true)
                     .monospacedDigit()
                     .foregroundColor(.cyan)
-                    .frame(width: 40)
+                    .frame(width: 50)
             } minimal: {
                 Image(systemName: "timer")
                     .foregroundColor(.cyan)

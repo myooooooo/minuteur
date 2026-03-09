@@ -93,7 +93,6 @@ struct FocusView: View {
                             .font(.system(size: 44))
                             .foregroundStyle(.white.opacity(0.9))
                     }
-                    .buttonStyle(.plain)
                     .accessibilityLabel(mainControlAccessibility)
 
                     Button {
@@ -103,7 +102,6 @@ struct FocusView: View {
                             .font(.system(size: 32))
                             .foregroundStyle(.white.opacity(0.75))
                     }
-                    .buttonStyle(.plain)
                     .accessibilityLabel("Stop")
                 }
 
