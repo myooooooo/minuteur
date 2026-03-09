@@ -1,17 +1,19 @@
-//
-//  TestApp.swift
-//  Test
-//
-//  Created by zineb on 06/03/2026.
-//
-
 import SwiftUI
 
 @main
-struct TestApp: App {
+struct FocusFlowApp: App {
+    @StateObject private var appState = AppStateManager()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            Group {
+                if appState.hasCompletedOnboarding {
+                    MainTabView()
+                } else {
+                    OnboardingView()
+                }
+            }
+            .environmentObject(appState)
         }
     }
 }

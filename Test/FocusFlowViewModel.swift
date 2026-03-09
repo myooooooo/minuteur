@@ -1,0 +1,450 @@
+import Foundation
+import Combine
+import AVFoundation
+
+#if canImport(ActivityKit) && os(iOS)
+import ActivityKit
+#endif
+
+@MainActor
+final class FocusFlowViewModel: ObservableObject {
+    enum Phase {
+        case setting
+        case running
+        case completed
+    }
+
+    enum SegmentType {
+        case work
+        case shortBreak
+        case longBreak
+
+        var label: String {
+            switch self {
+            case .work: return "TRAVAIL"
+            case .shortBreak, .longBreak: return "PAUSE"
+            }
+        }
+
+        var displayName: String {
+            switch self {
+            case .work: return "Session de Travail"
+            case .shortBreak: return "Pause Courte"
+            case .longBreak: return "Pause Longue"
+            }
+        }
+    }
+
+    @Published private(set) var phase: Phase = .setting
+    @Published var selectedMinutes: Int = 50
+    @Published private(set) var remainingSeconds: Int = 50 * 60
+    @Published var isTickHapticsEnabled: Bool = true
+    @Published private(set) var currentSegment: SegmentType = .work
+    @Published private(set) var isPaused: Bool = false
+
+    @Published var isSoundEnabled: Bool = false
+    @Published var selectedSoundscape: FocusSoundscape = .cyberRain
+
+    // Tracks full rotations on the circular selector (0...4 for max 300 min).
+    @Published private(set) var rotationCount: Int = 0
+
+    // Sensory feedback triggers consumed by the View.
+    @Published private(set) var selectionHapticTrigger: Int = 0
+    @Published private(set) var secondTickHapticTrigger: Int = 0
+    @Published private(set) var successHapticTrigger: Int = 0
+
+    // Persistence events consumed by views/app state.
+    @Published private(set) var sessionCompletionTrigger: Int = 0
+    @Published private(set) var lastCompletedSessionMinutes: Int = 0
+    @Published private(set) var earnedFocusMinutes: Int = 0
+    @Published private(set) var earnedFocusTrigger: Int = 0
+
+    private var completedWorkSessions: Int = 0
+    private let shortBreakMinutes = 5
+    private let longBreakMinutes = 15
+
+    #if canImport(ActivityKit) && os(iOS)
+    @Published var currentActivity: Activity<FocusFlowAttributes>? = nil
+
+    private var lastLiveActivityMaintenanceAt: Date = .distantPast
+    private let liveActivityMaintenanceInterval: TimeInterval = 10
+    #endif
+
+    private var timerCancellable: AnyCancellable?
+    private var previousRotationAngle: Double?
+    private let audioEngine = FocusAudioEngine()
+
+    var totalSeconds: Int {
+        segmentTotalSeconds
+    }
+
+    private var segmentTotalSeconds: Int = 50 * 60
+
+    var progress: Double {
+        guard totalSeconds > 0 else { return 0 }
+        return 1 - (Double(remainingSeconds) / Double(totalSeconds))
+    }
+
+    var timeDisplay: String {
+        let minutes = remainingSeconds / 60
+        let seconds = remainingSeconds % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+
+    var isRunningActive: Bool {
+        phase == .running && !isPaused
+    }
+
+    func setMinutesFromDrag(_ minutes: Int) {
+        guard phase == .setting else { return }
+
+        let clamped = min(max(minutes, 1), 300)
+        guard clamped != selectedMinutes else { return }
+
+        selectedMinutes = clamped
+        if currentSegment == .work {
+            remainingSeconds = clamped * 60
+            segmentTotalSeconds = clamped * 60
+        }
+        rotationCount = min(max((clamped - 1) / 60, 0), 4)
+        selectionHapticTrigger += 1
+    }
+
+    func updateMinutesFromRotation(angle: Double) {
+        guard phase == .setting else { return }
+
+        if previousRotationAngle == nil {
+            previousRotationAngle = angle
+        } else if let previousRotationAngle {
+            let delta = angle - previousRotationAngle
+
+            if delta < -.pi {
+                rotationCount += 1
+            }
+            if delta > .pi {
+                rotationCount -= 1
+            }
+
+            rotationCount = min(max(rotationCount, 0), 4)
+            self.previousRotationAngle = angle
+        }
+
+        let minuteInCurrentTurn = minuteFromAngle(angle)
+        let proposed = (rotationCount * 60) + minuteInCurrentTurn
+        let clamped = min(max(proposed, 1), 300)
+
+        setMinutesFromDrag(clamped)
+    }
+
+    func endRotationGesture() {
+        previousRotationAngle = nil
+    }
+
+    func start() {
+        if phase == .running {
+            if isPaused {
+                togglePauseResume()
+            }
+            return
+        }
+
+        completedWorkSessions = 0
+        beginSegment(.work, durationMinutes: selectedMinutes)
+    }
+
+    func reset() {
+        stopTimer()
+        stopSoundIfNeeded()
+        isPaused = false
+        phase = .setting
+        currentSegment = .work
+        remainingSeconds = selectedMinutes * 60
+        segmentTotalSeconds = selectedMinutes * 60
+        rotationCount = min(max((selectedMinutes - 1) / 60, 0), 4)
+
+        #if canImport(ActivityKit) && os(iOS)
+        Task {
+            await endLiveActivity()
+        }
+        #endif
+    }
+
+    func togglePauseResume() {
+        guard phase == .running else { return }
+        isPaused.toggle()
+
+        if isPaused {
+            stopSoundIfNeeded()
+        } else {
+            startSoundIfNeeded()
+        }
+
+        #if canImport(ActivityKit) && os(iOS)
+        Task {
+            await refreshLiveActivityState(force: true)
+        }
+        #endif
+    }
+
+    func toggleSound() {
+        isSoundEnabled.toggle()
+        if isSoundEnabled {
+            startSoundIfNeeded()
+        } else {
+            stopSoundIfNeeded()
+        }
+    }
+
+    func setSoundscape(_ soundscape: FocusSoundscape) {
+        selectedSoundscape = soundscape
+        if isSoundEnabled && isRunningActive {
+            audioEngine.play(soundscape: soundscape)
+        }
+    }
+
+    #if canImport(ActivityKit) && os(iOS)
+    /// Starts or refreshes Live Activity with current segment metadata.
+    func startLiveActivity(minutes: Int) {
+        let clamped = min(max(minutes, 1), 300)
+
+        Task {
+            guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+
+            if currentActivity == nil {
+                let state = makeLiveState(remaining: clamped * 60, total: clamped * 60)
+                do {
+                    currentActivity = try Activity<FocusFlowAttributes>.request(
+                        attributes: FocusFlowAttributes(sessionID: UUID()),
+                        content: ActivityContent(state: state, staleDate: nil),
+                        pushType: nil
+                    )
+                    lastLiveActivityMaintenanceAt = Date()
+                } catch {
+                    currentActivity = nil
+                }
+                return
+            }
+
+            await refreshLiveActivityState(force: true)
+        }
+    }
+    #endif
+
+    private func beginSegment(_ segment: SegmentType, durationMinutes: Int) {
+        currentSegment = segment
+        segmentTotalSeconds = max(1, durationMinutes * 60)
+        remainingSeconds = segmentTotalSeconds
+        isPaused = false
+        phase = .running
+
+        startTimer()
+        startSoundIfNeeded()
+
+        #if canImport(ActivityKit) && os(iOS)
+        Task {
+            if currentActivity == nil {
+                startLiveActivity(minutes: durationMinutes)
+            } else {
+                await refreshLiveActivityState(force: true)
+            }
+        }
+        #endif
+    }
+
+    private func startTimer() {
+        stopTimer()
+
+        timerCancellable = Timer
+            .publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.handleTick()
+            }
+    }
+
+    private func stopTimer() {
+        timerCancellable?.cancel()
+        timerCancellable = nil
+    }
+
+    private func handleTick() {
+        guard phase == .running else { return }
+
+        if isPaused {
+            #if canImport(ActivityKit) && os(iOS)
+            Task { await performLiveActivityMaintenanceIfNeeded() }
+            #endif
+            return
+        }
+
+        if remainingSeconds > 0 {
+            remainingSeconds -= 1
+
+            if isTickHapticsEnabled {
+                secondTickHapticTrigger += 1
+            }
+
+            #if canImport(ActivityKit) && os(iOS)
+            Task { await performLiveActivityMaintenanceIfNeeded() }
+            #endif
+        }
+
+        if remainingSeconds == 0 {
+            finishCurrentSegment()
+        }
+    }
+
+    private func finishCurrentSegment() {
+        if currentSegment == .work {
+            completedWorkSessions += 1
+
+            let earned = max(1, segmentTotalSeconds / 60)
+            earnedFocusMinutes = earned
+            earnedFocusTrigger += 1
+            sessionCompletionTrigger += 1
+            lastCompletedSessionMinutes = earned
+
+            if completedWorkSessions % 4 == 0 {
+                beginSegment(.longBreak, durationMinutes: longBreakMinutes)
+            } else {
+                beginSegment(.shortBreak, durationMinutes: shortBreakMinutes)
+            }
+            return
+        }
+
+        // Any break completion sends user back to a work session.
+        beginSegment(.work, durationMinutes: selectedMinutes)
+    }
+
+    private func startSoundIfNeeded() {
+        guard isSoundEnabled, isRunningActive else { return }
+        audioEngine.play(soundscape: selectedSoundscape)
+    }
+
+    private func stopSoundIfNeeded() {
+        audioEngine.stop()
+    }
+
+    private func minuteFromAngle(_ angle: Double) -> Int {
+        let normalized = max(0, min(1, angle / (2 * .pi)))
+        let minute = Int(round(normalized * 60))
+        return min(max(minute, 1), 60)
+    }
+
+    #if canImport(ActivityKit) && os(iOS)
+    private func makeLiveState(remaining: Int, total: Int) -> FocusFlowAttributes.ContentState {
+        FocusFlowAttributes.ContentState(
+            targetDate: Date().addingTimeInterval(TimeInterval(max(remaining, 0))),
+            phaseLabel: currentSegment.label,
+            isPaused: isPaused,
+            remainingSeconds: max(remaining, 0),
+            totalSeconds: max(total, 1)
+        )
+    }
+
+    private func refreshLiveActivityState(force: Bool) async {
+        guard let currentActivity else { return }
+
+        guard isActivityValid(currentActivity) else {
+            self.currentActivity = nil
+            return
+        }
+
+        let now = Date()
+        if !force && now.timeIntervalSince(lastLiveActivityMaintenanceAt) < liveActivityMaintenanceInterval {
+            return
+        }
+
+        lastLiveActivityMaintenanceAt = now
+        let state = makeLiveState(remaining: remainingSeconds, total: segmentTotalSeconds)
+        await currentActivity.update(ActivityContent(state: state, staleDate: nil))
+    }
+
+    private func performLiveActivityMaintenanceIfNeeded() async {
+        await refreshLiveActivityState(force: false)
+    }
+
+    private func isActivityValid(_ activity: Activity<FocusFlowAttributes>) -> Bool {
+        let exists = Activity<FocusFlowAttributes>.activities.contains { $0.id == activity.id }
+        guard exists else { return false }
+        return activity.activityState == .active
+    }
+
+    private func endLiveActivity() async {
+        guard let currentActivity else { return }
+
+        guard isActivityValid(currentActivity) else {
+            self.currentActivity = nil
+            return
+        }
+
+        let finalState = makeLiveState(remaining: 0, total: max(segmentTotalSeconds, 1))
+        await currentActivity.end(
+            ActivityContent(state: finalState, staleDate: nil),
+            dismissalPolicy: .immediate
+        )
+        self.currentActivity = nil
+    }
+    #endif
+
+    deinit {
+        timerCancellable?.cancel()
+    }
+}
+private final class FocusAudioEngine {
+    private var player: AVAudioPlayer?
+    private var currentSoundscape: FocusSoundscape?
+
+    func play(soundscape: FocusSoundscape) {
+        if currentSoundscape == soundscape, player?.isPlaying == true {
+            return
+        }
+
+        stop()
+
+        guard let url = resourceURL(for: soundscape) else {
+            return
+        }
+
+        do {
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.numberOfLoops = -1
+            player.volume = 0.25
+            player.prepareToPlay()
+            player.play()
+
+            self.player = player
+            self.currentSoundscape = soundscape
+        } catch {
+            stop()
+        }
+    }
+
+    func stop() {
+        player?.stop()
+        player = nil
+        currentSoundscape = nil
+    }
+
+    private func resourceURL(for soundscape: FocusSoundscape) -> URL? {
+        let candidates: [(name: String, ext: String)]
+
+        switch soundscape {
+        case .cyberRain:
+            candidates = [("cyber_rain", "mp3"), ("cyber_rain", "m4a"), ("cyber_rain", "wav")]
+        case .pureWhiteNoise:
+            candidates = [("white_noise", "mp3"), ("white_noise", "m4a"), ("white_noise", "wav")]
+        case .calmCafe:
+            candidates = [("calm_cafe", "mp3"), ("calm_cafe", "m4a"), ("calm_cafe", "wav")]
+        }
+
+        for candidate in candidates {
+            if let url = Bundle.main.url(forResource: candidate.name, withExtension: candidate.ext) {
+                return url
+            }
+        }
+
+        return nil
+    }
+}
+
