@@ -75,24 +75,28 @@ struct IslandView: Widget {
                 .padding(12)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-        } dynamicIsland: { context in
+        } dynamicIsland: { _ in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Text("Test")
+                    Text("Go")
                 }
 
                 DynamicIslandExpandedRegion(.trailing) {
+                    Text("Focus")
                 }
 
                 DynamicIslandExpandedRegion(.bottom) {
+                    Text("Session en cours")
                 }
             } compactLeading: {
-                Text("L")
+                Image(systemName: "timer")
+                    .foregroundColor(.cyan)
             } compactTrailing: {
-                Text("T")
-                    .frame(width: 45)
+                Text("50m")
+                    .foregroundColor(.cyan)
             } minimal: {
-                Text("M")
+                Image(systemName: "timer")
+                    .foregroundColor(.cyan)
             }
         }
     }
