@@ -106,6 +106,24 @@ struct LandingPageView: View {
             logoBreathing = true
             buttonPulse = true
         }
+        .overlay(alignment: .topTrailing) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    selectedPage = 0
+                }
+                appState.resetOnboarding()
+            } label: {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.45))
+                    .padding(10)
+                    .background(Color.white.opacity(0.06), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 14)
+            .padding(.trailing, 14)
+            .accessibilityLabel("Réinitialiser l'onboarding")
+        }
     }
 
     private func onboardingPage(title: String, subtitle: String) -> some View {
