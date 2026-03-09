@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct LandingPageView: View {
     @EnvironmentObject var appState: AppStateManager
@@ -25,12 +28,21 @@ struct LandingPageView: View {
             VStack(spacing: 24) {
                 Spacer(minLength: 20)
 
-                Image("FocusLogo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 96, height: 96)
-                    .scaleEffect(logoBreathing ? 1.06 : 0.94)
-                    .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: logoBreathing)
+                Group {
+                    if UIImage(named: "FocusLogo") != nil {
+                        Image("FocusLogo")
+                            .resizable()
+                            .scaledToFit()
+                    } else {
+                        Image(systemName: "scope")
+                            .resizable()
+                            .scaledToFit()
+                            .foregroundStyle(.cyan)
+                    }
+                }
+                .frame(width: 96, height: 96)
+                .scaleEffect(logoBreathing ? 1.06 : 0.94)
+                .animation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true), value: logoBreathing)
 
                 VStack(spacing: 10) {
                     Text("FOCUS FLOW")
