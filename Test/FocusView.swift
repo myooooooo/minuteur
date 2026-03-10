@@ -16,6 +16,11 @@ struct FocusView: View {
     @State private var gestureStartMinutes: Int = 50
     @State private var speakerPulse = false
     @State private var glowPulse = false
+    @State private var showMixer = false
+    @State private var showBadgeAlert = false
+    @State private var showChallengeComplete = false
+    /// Tracks whether the user left the app during a strict-mode work session.
+    @State private var didLeaveAppDuringStrict = false
 
     private let ringSize: CGFloat = 250
     private let ringLineWidth: CGFloat = 8
@@ -85,6 +90,16 @@ struct FocusView: View {
                                 }
                             }
                         }
+
+                        Divider()
+
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                showMixer.toggle()
+                            }
+                        } label: {
+                            Label("Mixer", systemImage: "slider.horizontal.3")
+                        }
                     } label: {
                         Image(systemName: viewModel.isSoundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                             .font(.system(size: 20, weight: .semibold))
@@ -112,6 +127,11 @@ struct FocusView: View {
                     .accessibilityLabel("Stop")
                 }
 
+                // MARK: - Dual-Layer Mixer Panel
+                if showMixer {
+                    mixerPanel
+                }
+
                 Spacer()
 
                 Toggle(isOn: Binding(
@@ -136,6 +156,8 @@ struct FocusView: View {
             viewModel.isTickHapticsEnabled = appState.isVibrationsEnabled
             viewModel.setSoundscape(appState.selectedSoundscape)
             viewModel.prepareAudio()
+            // Schedule 24h inactivity reminder on each app launch.
+            InactivityReminderManager.scheduleInactivityReminder()
         }
         .onChange(of: viewModel.selectedMinutes) { _, newValue in
             if previousDragAngle == nil {
@@ -149,6 +171,7 @@ struct FocusView: View {
                 accumulatedDragAngle = 0
             }
             if newValue == .running {
+                didLeaveAppDuringStrict = false
                 withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
                     glowPulse = true
                 }
@@ -163,10 +186,33 @@ struct FocusView: View {
             viewModel.setSoundscape(newValue)
         }
         .onChange(of: viewModel.earnedFocusTrigger) { _, _ in
-            appState.addXP(minutes: viewModel.earnedFocusMinutes)
+            appState.addXP(
+                minutes: viewModel.earnedFocusMinutes,
+                wasStrictViolation: didLeaveAppDuringStrict && appState.isStrictFocusModeEnabled
+            )
+            didLeaveAppDuringStrict = false
+        }
+        .onChange(of: viewModel.completionHapticTrigger) { _, _ in
+            performCompletionHapticSequence()
+        }
+        .onChange(of: appState.newlyEarnedBadge) { _, badge in
+            if badge != nil { showBadgeAlert = true }
+        }
+        .onChange(of: appState.challengeCompletedTrigger) { _, _ in
+            showChallengeComplete = true
         }
         .onChange(of: scenePhase) { _, newValue in
             handleScenePhaseChange(newValue)
+        }
+        .overlay(alignment: .top) {
+            if showBadgeAlert, let badge = appState.newlyEarnedBadge {
+                badgeToast(badge)
+            }
+        }
+        .overlay(alignment: .top) {
+            if showChallengeComplete {
+                challengeCompleteToast
+            }
         }
     }
 
@@ -334,9 +380,17 @@ struct FocusView: View {
         switch phase {
         case .active:
             viewModel.refreshRemainingFromTargetDate()
+            // Re-schedule 24h inactivity reminder each time app becomes active.
+            InactivityReminderManager.scheduleInactivityReminder()
         case .inactive, .background:
-            guard appState.isStrictFocusModeEnabled else { return }
             guard viewModel.isRunningActive else { return }
+
+            // Strict Mode 2.0: flag XP penalty if the user leaves during a work session.
+            if appState.isStrictFocusModeEnabled, viewModel.currentSegment == .work {
+                didLeaveAppDuringStrict = true
+            }
+
+            guard appState.isStrictFocusModeEnabled else { return }
             Task {
                 await StrictFocusNotificationManager.scheduleReminder(remainingSeconds: viewModel.remainingSeconds)
             }
@@ -345,10 +399,196 @@ struct FocusView: View {
         }
     }
 
+    // MARK: - Mixer Panel
+
+    private var mixerPanel: some View {
+        VStack(spacing: 12) {
+            Text("MIXER")
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.5))
+                .tracking(2)
+
+            // Primary layer
+            VStack(alignment: .leading, spacing: 4) {
+                Text(viewModel.selectedSoundscape.title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.7))
+                Slider(
+                    value: Binding(
+                        get: { viewModel.primaryVolume },
+                        set: { viewModel.updatePrimaryVolume($0) }
+                    ),
+                    in: 0...1
+                )
+                .tint(activeAccent)
+            }
+
+            // Secondary layer
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(viewModel.secondarySoundscape?.title ?? "Couche 2")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.7))
+                    Spacer()
+                    Menu {
+                        Button("Aucun") {
+                            viewModel.setSecondarySoundscape(nil)
+                        }
+                        ForEach(FocusSoundscape.allCases, id: \.rawValue) { sound in
+                            Button(sound.title) {
+                                viewModel.setSecondarySoundscape(sound)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+                }
+                if viewModel.secondarySoundscape != nil {
+                    Slider(
+                        value: Binding(
+                            get: { viewModel.secondaryVolume },
+                            set: { viewModel.updateSecondaryVolume($0) }
+                        ),
+                        in: 0...1
+                    )
+                    .tint(activeAccent.opacity(0.7))
+                }
+            }
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+                .environment(\.colorScheme, .dark)
+        )
+        .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+
+    // MARK: - Completion Haptic Sequence
+
+    private func performCompletionHapticSequence() {
+        #if canImport(UIKit)
+        guard appState.isVibrationsEnabled else { return }
+
+        let notification = UINotificationFeedbackGenerator()
+        notification.prepare()
+
+        // Pattern: success → light impact → heavy impact → success
+        notification.notificationOccurred(.success)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            let light = UIImpactFeedbackGenerator(style: .light)
+            light.impactOccurred()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            let heavy = UIImpactFeedbackGenerator(style: .heavy)
+            heavy.impactOccurred()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let finalSuccess = UINotificationFeedbackGenerator()
+            finalSuccess.notificationOccurred(.success)
+        }
+        #endif
+    }
+
+    // MARK: - Badge Toast
+
+    private func badgeToast(_ badge: FocusBadge) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: badge.symbol)
+                .font(.system(size: 22))
+                .foregroundStyle(activeAccent)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Badge débloqué !")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.6))
+                Text(badge.title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .environment(\.colorScheme, .dark)
+        )
+        .padding(.top, 60)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                withAnimation { showBadgeAlert = false }
+                appState.newlyEarnedBadge = nil
+            }
+        }
+    }
+
+    // MARK: - Challenge Complete Toast
+
+    private var challengeCompleteToast: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "star.circle.fill")
+                .font(.system(size: 22))
+                .foregroundStyle(.yellow)
+            Text("Défi du jour complété !")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
+        .background(
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .environment(\.colorScheme, .dark)
+        )
+        .padding(.top, 60)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+                withAnimation { showChallengeComplete = false }
+            }
+        }
+    }
+
     private func pulseSpeakerIcon() {
         speakerPulse = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
             speakerPulse = false
+        }
+    }
+}
+
+// MARK: - 24h Inactivity Reminder
+
+private enum InactivityReminderManager {
+    static func scheduleInactivityReminder() {
+        Task {
+            let center = UNUserNotificationCenter.current()
+            let settings = await center.notificationSettings()
+
+            guard settings.authorizationStatus == .authorized ||
+                  settings.authorizationStatus == .provisional ||
+                  settings.authorizationStatus == .notDetermined else { return }
+
+            if settings.authorizationStatus == .notDetermined {
+                _ = try? await center.requestAuthorization(options: [.alert, .sound])
+            }
+
+            // Remove any previous inactivity reminder.
+            center.removePendingNotificationRequests(withIdentifiers: ["focusflow.inactivity.24h"])
+
+            let content = UNMutableNotificationContent()
+            content.title = "Tu nous manques !"
+            content.body = "Ça fait 24h sans session de focus. Reviens maintenir ta série !"
+            content.sound = .default
+
+            // Fire 24 hours from now.
+            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 24 * 60 * 60, repeats: false)
+            let request = UNNotificationRequest(identifier: "focusflow.inactivity.24h", content: content, trigger: trigger)
+            try? await center.add(request)
         }
     }
 }

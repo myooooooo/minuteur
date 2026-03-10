@@ -44,6 +44,13 @@ final class FocusFlowViewModel: ObservableObject {
 
     @Published var isSoundEnabled: Bool = false
     @Published var selectedSoundscape: FocusSoundscape = .cyberRain
+    @Published var secondarySoundscape: FocusSoundscape? = nil
+    @Published var primaryVolume: Float = 0.25
+    @Published var secondaryVolume: Float = 0.15
+    /// Trigger for the completion haptic sequence (consumed by the View).
+    @Published private(set) var completionHapticTrigger: Int = 0
+    /// Set by FocusView when the user leaves the app during strict mode.
+    @Published var strictModeViolated: Bool = false
 
     // Tracks full rotations on the circular selector (0...4 for max 300 min).
     @Published private(set) var rotationCount: Int = 0
@@ -238,6 +245,32 @@ final class FocusFlowViewModel: ObservableObject {
         }
     }
 
+    func setSecondarySoundscape(_ soundscape: FocusSoundscape?) {
+        secondarySoundscape = soundscape
+        if isSoundEnabled && isRunningActive {
+            spawnTask { [weak self] in
+                guard let self else { return }
+                await self.audioEngine.setSecondaryLayer(soundscape)
+            }
+        }
+    }
+
+    func updatePrimaryVolume(_ volume: Float) {
+        primaryVolume = volume
+        spawnTask { [weak self] in
+            guard let self else { return }
+            await self.audioEngine.setPrimaryVolume(volume)
+        }
+    }
+
+    func updateSecondaryVolume(_ volume: Float) {
+        secondaryVolume = volume
+        spawnTask { [weak self] in
+            guard let self else { return }
+            await self.audioEngine.setSecondaryVolume(volume)
+        }
+    }
+
     func prepareAudio() {
         spawnTask { [weak self] in await self?.audioEngine.preloadAll() }
     }
@@ -369,6 +402,9 @@ final class FocusFlowViewModel: ObservableObject {
             sessionCompletionTrigger += 1
             lastCompletedSessionMinutes = earned
 
+            // Fire the completion haptic sequence trigger.
+            completionHapticTrigger += 1
+
             if completedWorkSessions % 4 == 0 {
                 beginSegment(.longBreak, durationMinutes: longBreakMinutes)
             } else {
@@ -383,7 +419,12 @@ final class FocusFlowViewModel: ObservableObject {
 
     private func startSoundIfNeeded() async {
         guard isSoundEnabled, isRunningActive else { return }
+        await audioEngine.setPrimaryVolume(primaryVolume)
         await audioEngine.play(soundscape: selectedSoundscape)
+        if let secondary = secondarySoundscape {
+            await audioEngine.setSecondaryVolume(secondaryVolume)
+            await audioEngine.setSecondaryLayer(secondary)
+        }
     }
 
     private func stopSoundIfNeeded() async {
