@@ -15,6 +15,7 @@ struct FocusView: View {
     @State private var accumulatedDragAngle: Double = 0
     @State private var gestureStartMinutes: Int = 50
     @State private var speakerPulse = false
+    @State private var glowPulse = false
 
     private let ringSize: CGFloat = 250
     private let ringLineWidth: CGFloat = 8
@@ -33,7 +34,8 @@ struct FocusView: View {
                 NeonRingView(
                     progress: ringProgress,
                     colors: ringColors,
-                    lineWidth: ringLineWidth
+                    lineWidth: ringLineWidth,
+                    glowIntensity: neonGlowIntensity
                 )
                 .frame(width: ringSize, height: ringSize)
                     .gesture(
@@ -146,6 +148,13 @@ struct FocusView: View {
                 previousDragAngle = nil
                 accumulatedDragAngle = 0
             }
+            if newValue == .running {
+                withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
+                    glowPulse = true
+                }
+            } else {
+                glowPulse = false
+            }
         }
         .onChange(of: appState.isVibrationsEnabled) { _, newValue in
             viewModel.isTickHapticsEnabled = newValue
@@ -159,6 +168,17 @@ struct FocusView: View {
         .onChange(of: scenePhase) { _, newValue in
             handleScenePhaseChange(newValue)
         }
+    }
+
+    /// Dynamic glow intensity: pulses between 0.3 and 1.0 during active sessions,
+    /// intensifying as the session nears completion.
+    private var neonGlowIntensity: Double {
+        guard viewModel.phase == .running, !viewModel.isPaused else { return 0 }
+        // Base intensity from progress (0→1 as time elapses).
+        let progressFactor = viewModel.progress
+        // Pulse oscillation adds dynamic life.
+        let pulseFactor: Double = glowPulse ? 0.3 : 0.0
+        return min(1.0, 0.2 + progressFactor * 0.5 + pulseFactor)
     }
 
     private var ringColors: [Color] {

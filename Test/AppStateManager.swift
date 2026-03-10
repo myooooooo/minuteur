@@ -66,19 +66,35 @@ enum NeonTheme: String, CaseIterable {
         colors.first ?? .cyan
     }
 
-    /// Nil means always unlocked.
-    var requiredHours: Int? {
+    /// Tier index (0-based) for exponential XP threshold calculation.
+    /// nil = always unlocked (free tiers).
+    var tier: Int? {
         switch self {
-        case .gold: return 5
-        case .violet: return 15
-        case .crimson: return 30
-        default: return nil
+        case .cyan, .indigo, .emerald, .fireOrange: return nil
+        case .gold: return 0    // ~300 XP (5h)
+        case .violet: return 1  // ~900 XP (15h)
+        case .crimson: return 2 // ~2700 XP (45h)
         }
     }
 
+    /// XP required to unlock, computed via exponential scaling: base * 3^tier.
+    /// Returns nil for always-unlocked themes.
+    var requiredXP: Int? {
+        guard let tier else { return nil }
+        return NeonTheme.xpThreshold(forTier: tier)
+    }
+
+    /// Exponential threshold: 300 * 3^tier → 300, 900, 2700, ...
+    static func xpThreshold(forTier tier: Int) -> Int {
+        let base = 300
+        var result = base
+        for _ in 0..<tier { result *= 3 }
+        return result
+    }
+
     func isUnlocked(totalXP: Int) -> Bool {
-        guard let requiredHours else { return true }
-        return (totalXP / 60) >= requiredHours
+        guard let requiredXP else { return true }
+        return totalXP >= requiredXP
     }
 }
 
@@ -91,6 +107,8 @@ final class AppStateManager: ObservableObject {
     @AppStorage("selectedSoundscape") private var selectedSoundscapeStorage: String = FocusSoundscape.cyberRain.rawValue
     @AppStorage("isStrictFocusModeEnabled") private var isStrictFocusModeEnabledStorage: Bool = false
     @AppStorage("focusflow.totalXP") private var totalXPStorage: Int = 0
+    @AppStorage("focusflow.streak") private var streakStorage: Int = 0
+    @AppStorage("focusflow.lastFocusDate") private var lastFocusDateStorage: String = ""
 
     @Published var hasCompletedOnboarding: Bool = false
     @Published var selectedTab: AppTab = .focus
@@ -100,6 +118,8 @@ final class AppStateManager: ObservableObject {
     @Published var isStrictFocusModeEnabled: Bool = false
     @Published var totalXP: Int = 0
     @Published var newlyUnlockedTheme: NeonTheme?
+    /// Consecutive days with at least one completed focus session.
+    @Published private(set) var streak: Int = 0
 
     var level: Int {
         max(1, (totalXP / 300) + 1)
@@ -107,6 +127,11 @@ final class AppStateManager: ObservableObject {
 
     var totalFocusHours: Int {
         totalXP / 60
+    }
+
+    /// XP multiplier based on streak: 1.0x base + 0.1x per streak day, capped at 2.0x.
+    var streakMultiplier: Double {
+        min(2.0, 1.0 + Double(streak) * 0.1)
     }
 
     var levelTitle: String {
@@ -122,9 +147,20 @@ final class AppStateManager: ObservableObject {
         NeonTheme.allCases.filter { $0.isUnlocked(totalXP: totalXP) }
     }
 
+    /// XP required to reach the next level from the current level.
+    var xpForNextLevel: Int { level * 300 }
+
+    /// XP progress within the current level (0.0 to 1.0).
+    var xpProgressInLevel: Double {
+        let currentLevelBase = (level - 1) * 300
+        let progressInLevel = totalXP - currentLevelBase
+        return Double(progressInLevel) / 300.0
+    }
+
     init() {
         hasCompletedOnboarding = onboardingStorage
         totalXP = totalXPStorage
+        streak = streakStorage
 
         let storedTheme = NeonTheme(rawValue: selectedNeonThemeStorage) ?? .cyan
         neonTheme = storedTheme.isUnlocked(totalXP: totalXP) ? storedTheme : .cyan
@@ -167,18 +203,56 @@ final class AppStateManager: ObservableObject {
 
     func addXP(minutes: Int) {
         guard minutes > 0 else { return }
+
+        // Update streak based on date continuity.
+        updateStreak()
+
+        // Apply streak multiplier to earned XP.
+        let multipliedXP = Int(ceil(Double(minutes) * streakMultiplier))
+
         let previouslyUnlocked = Set(unlockedThemes)
-        totalXP += minutes
+        totalXP += multipliedXP
         totalXPStorage = totalXP
 
         let nowUnlocked = Set(unlockedThemes)
         let newThemes = nowUnlocked.subtracting(previouslyUnlocked)
-        newlyUnlockedTheme = newThemes.sorted { ($0.requiredHours ?? 0) < ($1.requiredHours ?? 0) }.last
+        newlyUnlockedTheme = newThemes.sorted { ($0.requiredXP ?? 0) < ($1.requiredXP ?? 0) }.last
 
         // If current selected theme becomes invalid after migration edge cases, fallback.
         if !neonTheme.isUnlocked(totalXP: totalXP) {
             neonTheme = .cyan
             selectedNeonThemeStorage = NeonTheme.cyan.rawValue
         }
+    }
+
+    /// Updates the streak counter: increments if today is the day after last focus,
+    /// resets to 1 if more than one day has passed, stays unchanged if same day.
+    private func updateStreak() {
+        let todayStamp = Self.dayStamp(for: Date())
+        let lastStamp = lastFocusDateStorage
+
+        if lastStamp == todayStamp {
+            // Already counted today — no change.
+            return
+        }
+
+        if lastStamp == Self.dayStamp(for: Calendar.current.date(byAdding: .day, value: -1, to: Date()) ?? Date()) {
+            // Consecutive day — increment streak.
+            streak += 1
+        } else {
+            // Gap detected — reset streak.
+            streak = 1
+        }
+
+        streakStorage = streak
+        lastFocusDateStorage = todayStamp
+    }
+
+    private static func dayStamp(for date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = .current
+        formatter.locale = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
     }
 }

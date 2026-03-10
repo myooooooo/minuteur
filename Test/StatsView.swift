@@ -36,8 +36,7 @@ struct StatsView: View {
     }
 
     private var xpProgressInLevel: Double {
-        let progress = appState.totalXP % 300
-        return Double(progress) / 300.0
+        appState.xpProgressInLevel
     }
 
     var body: some View {
@@ -113,6 +112,11 @@ struct StatsView: View {
                 HStack(spacing: 12) {
                     scoreCard(title: "Total Semaine", value: formattedTotalHours(totalWeekMinutes))
                     scoreCard(title: "Moyenne Focus", value: "\(Int(averageFocusMinutes)) min")
+                }
+
+                HStack(spacing: 12) {
+                    scoreCard(title: "Série", value: "\(appState.streak) jour\(appState.streak > 1 ? "s" : "")")
+                    scoreCard(title: "Multiplicateur", value: String(format: "×%.1f", appState.streakMultiplier))
                 }
 
                 if let selectedData {

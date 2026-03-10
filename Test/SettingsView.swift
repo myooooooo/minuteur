@@ -18,7 +18,7 @@ struct SettingsView: View {
                     .listRowBackground(Color.black)
 
                     if !lockedThemes.isEmpty {
-                        Text("Déverrouillement: Or (5h), Violet (15h), Rouge (30h)")
+                        Text("Déverrouillement: Or (300 XP), Violet (900 XP), Rouge (2700 XP)")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                             .listRowBackground(Color.black)
@@ -61,11 +61,25 @@ struct SettingsView: View {
                         .foregroundStyle(.white)
                         .listRowBackground(Color.black)
 
-                    Link("Portfolio", destination: URL(string: "https://example.com/portfolio")!)
-                        .listRowBackground(Color.black)
+                    Link(destination: URL(string: "https://example.com/portfolio")!) {
+                        HStack {
+                            Image(systemName: "globe")
+                                .foregroundStyle(appState.neonTheme.accentColor)
+                            Text("Portfolio")
+                                .foregroundStyle(.white.opacity(0.9))
+                        }
+                    }
+                    .listRowBackground(Color.black)
 
-                    Link("LinkedIn", destination: URL(string: "https://www.linkedin.com")!)
-                        .listRowBackground(Color.black)
+                    Link(destination: URL(string: "https://www.linkedin.com")!) {
+                        HStack {
+                            Image(systemName: "link")
+                                .foregroundStyle(appState.neonTheme.accentColor)
+                            Text("LinkedIn")
+                                .foregroundStyle(.white.opacity(0.9))
+                        }
+                    }
+                    .listRowBackground(Color.black)
                 }
             }
             .scrollContentBackground(.hidden)

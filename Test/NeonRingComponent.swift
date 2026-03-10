@@ -4,12 +4,16 @@ struct NeonRingComponent: View {
     let progress: Double
     let colors: [Color]
     let lineWidth: CGFloat
+    var glowIntensity: Double = 0
 
     var body: some View {
         let gradient = AngularGradient(
             gradient: Gradient(colors: [colors[0], colors[1], colors[0]]),
             center: .center
         )
+
+        let glowRadius: CGFloat = 5 + CGFloat(glowIntensity) * 20
+        let glowOpacity: Double = 0.5 + glowIntensity * 0.4
 
         return ZStack {
             Circle()
@@ -22,7 +26,8 @@ struct NeonRingComponent: View {
                     style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
                 )
                 .rotationEffect(.degrees(-90))
-                .shadow(color: colors[0].opacity(0.7), radius: 10, x: 0, y: 0)
+                .shadow(color: colors[0].opacity(glowOpacity), radius: glowRadius, x: 0, y: 0)
+                .shadow(color: colors[1].opacity(glowOpacity * 0.5), radius: glowRadius * 0.6, x: 0, y: 0)
         }
         // Isolated GPU rasterization only for the neon ring.
         .drawingGroup()

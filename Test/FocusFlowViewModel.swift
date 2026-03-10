@@ -74,10 +74,30 @@ final class FocusFlowViewModel: ObservableObject {
 
     private var timerCancellable: AnyCancellable?
     private var previousRotationAngle: Double?
+    /// Tracks all fire-and-forget Tasks so they can be cancelled on reset/deinit.
+    private var activeTasks: [Task<Void, Never>] = []
     private lazy var audioEngine = FocusAudioEngine(errorHandler: { [weak self] message in
         self?.audioLastError = message
     })
     private var segmentTargetDate: Date?
+
+    /// Spawns a tracked Task that is automatically cancelled on reset/deinit.
+    /// Inherits MainActor isolation from the class.
+    @discardableResult
+    private func spawnTask(_ operation: @escaping @MainActor () async -> Void) -> Task<Void, Never> {
+        let task = Task { @MainActor [weak self] in
+            await operation()
+            self?.activeTasks.removeAll { $0.isCancelled }
+        }
+        activeTasks.append(task)
+        return task
+    }
+
+    /// Cancels all tracked tasks.
+    private func cancelAllTasks() {
+        activeTasks.forEach { $0.cancel() }
+        activeTasks.removeAll()
+    }
 
     var totalSeconds: Int {
         segmentTotalSeconds
@@ -160,7 +180,8 @@ final class FocusFlowViewModel: ObservableObject {
 
     func reset() {
         stopTimer()
-        Task { await stopSoundIfNeeded() }
+        cancelAllTasks()
+        spawnTask { [weak self] in await self?.stopSoundIfNeeded() }
         isPaused = false
         phase = .setting
         currentSegment = .work
@@ -172,8 +193,8 @@ final class FocusFlowViewModel: ObservableObject {
         #if canImport(ActivityKit) && os(iOS)
         liveActivityStartTask?.cancel()
         liveActivityStartTask = nil
-        Task {
-            await endLiveActivity()
+        spawnTask { [weak self] in
+            await self?.endLiveActivity()
         }
         #endif
     }
@@ -183,17 +204,17 @@ final class FocusFlowViewModel: ObservableObject {
         if isPaused {
             isPaused = false
             segmentTargetDate = Date().addingTimeInterval(TimeInterval(max(remainingSeconds, 0)))
-            Task { await startSoundIfNeeded() }
+            spawnTask { [weak self] in await self?.startSoundIfNeeded() }
         } else {
             isPaused = true
             syncRemainingSecondsFromTargetDate()
             segmentTargetDate = nil
-            Task { await stopSoundIfNeeded() }
+            spawnTask { [weak self] in await self?.stopSoundIfNeeded() }
         }
 
         #if canImport(ActivityKit) && os(iOS)
-        Task {
-            await refreshLiveActivityState()
+        spawnTask { [weak self] in
+            await self?.refreshLiveActivityState()
         }
         #endif
     }
@@ -201,21 +222,24 @@ final class FocusFlowViewModel: ObservableObject {
     func toggleSound() {
         isSoundEnabled.toggle()
         if isSoundEnabled {
-            Task { await startSoundIfNeeded() }
+            spawnTask { [weak self] in await self?.startSoundIfNeeded() }
         } else {
-            Task { await stopSoundIfNeeded() }
+            spawnTask { [weak self] in await self?.stopSoundIfNeeded() }
         }
     }
 
     func setSoundscape(_ soundscape: FocusSoundscape) {
         selectedSoundscape = soundscape
         if isSoundEnabled && isRunningActive {
-            Task { await audioEngine.transition(to: soundscape) }
+            spawnTask { [weak self] in
+                guard let self else { return }
+                await self.audioEngine.transition(to: soundscape)
+            }
         }
     }
 
     func prepareAudio() {
-        Task { await audioEngine.preloadAll() }
+        spawnTask { [weak self] in await self?.audioEngine.preloadAll() }
     }
 
     func refreshRemainingFromTargetDate() {
@@ -228,15 +252,16 @@ final class FocusFlowViewModel: ObservableObject {
         let clamped = min(max(minutes, 1), 300)
 
         if currentActivity != nil {
-            Task { await refreshLiveActivityState() }
+            spawnTask { [weak self] in await self?.refreshLiveActivityState() }
             return
         }
 
         guard !isStartingLiveActivity else { return }
         isStartingLiveActivity = true
 
-        Task {
-            defer { isStartingLiveActivity = false }
+        spawnTask { [weak self] in
+            defer { self?.isStartingLiveActivity = false }
+            guard let self else { return }
             guard ActivityAuthorizationInfo().areActivitiesEnabled else {
                 liveActivityLastError = "ActivityKit disabled by system settings."
                 return
@@ -244,6 +269,7 @@ final class FocusFlowViewModel: ObservableObject {
 
             guard currentActivity == nil else { return }
             try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard !Task.isCancelled else { return }
             guard currentActivity == nil else { return }
             let configuredSeconds = clamped * 60
             let initialRemaining = phase == .running ? remainingSeconds : configuredSeconds
@@ -277,21 +303,21 @@ final class FocusFlowViewModel: ObservableObject {
         phase = .running
 
         startTimer()
-        Task { await startSoundIfNeeded() }
+        spawnTask { [weak self] in await self?.startSoundIfNeeded() }
 
         #if canImport(ActivityKit) && os(iOS)
         liveActivityStartTask?.cancel()
         if currentActivity == nil {
-            liveActivityStartTask = Task {
+            liveActivityStartTask = spawnTask { [weak self] in
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
                 guard !Task.isCancelled else { return }
-                guard phase == .running else { return }
+                guard let self, phase == .running else { return }
                 startLiveActivity(minutes: durationMinutes)
                 liveActivityStartTask = nil
             }
         } else {
-            Task {
-                await refreshLiveActivityState()
+            spawnTask { [weak self] in
+                await self?.refreshLiveActivityState()
             }
         }
         #endif
@@ -440,5 +466,6 @@ final class FocusFlowViewModel: ObservableObject {
 
     deinit {
         timerCancellable?.cancel()
+        activeTasks.forEach { $0.cancel() }
     }
 }

@@ -7,16 +7,20 @@ actor FocusAudioEngine {
     private var cachedPlayers: [FocusSoundscape: AVAudioPlayer] = [:]
     private var fadeGeneration: Int = 0
     private var isSessionConfigured = false
+    /// True when playback was active before an interruption (e.g. phone call).
+    private var wasPlayingBeforeInterruption = false
 
     nonisolated private let targetVolume: Float = 0.25
     nonisolated private let fadeDuration: TimeInterval = 2.0
 
     private let errorHandler: @MainActor @Sendable (String) -> Void
+    private var interruptionObserver: (any NSObjectProtocol)?
 
     init(errorHandler: @escaping @MainActor @Sendable (String) -> Void) {
         self.errorHandler = errorHandler
         Task { [weak self] in
             await self?.configureSessionIfNeeded()
+            await self?.observeInterruptions()
         }
     }
 
@@ -121,6 +125,50 @@ actor FocusAudioEngine {
         } catch {
             Task { await errorHandler("Audio session error: \(error.localizedDescription)") }
             isSessionConfigured = false
+        }
+    }
+
+    /// Observes AVAudioSession interruptions (e.g. incoming call) and resumes
+    /// playback with a fade-in when the interruption ends.
+    private func observeInterruptions() {
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: nil
+        ) { [weak self] notification in
+            Task { [weak self] in
+                await self?.handleInterruption(notification)
+            }
+        }
+    }
+
+    private func handleInterruption(_ notification: Notification) async {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+
+        switch type {
+        case .began:
+            wasPlayingBeforeInterruption = player?.isPlaying == true
+            player?.pause()
+
+        case .ended:
+            guard wasPlayingBeforeInterruption else { return }
+            wasPlayingBeforeInterruption = false
+
+            // Re-activate audio session after interruption.
+            let session = AVAudioSession.sharedInstance()
+            try? session.setActive(true, options: [])
+
+            // Resume with fade-in for a smooth transition.
+            player?.volume = 0
+            player?.play()
+            await fade(to: targetVolume, duration: fadeDuration)
+
+        @unknown default:
+            break
         }
     }
 }
