@@ -14,6 +14,7 @@ struct FocusView: View {
     @State private var previousDragAngle: Double?
     @State private var accumulatedDragAngle: Double = 0
     @State private var gestureStartMinutes: Int = 50
+    @State private var speakerPulse = false
 
     private let ringSize: CGFloat = 250
     private let ringLineWidth: CGFloat = 8
@@ -64,6 +65,7 @@ struct FocusView: View {
                     Menu {
                         Button(viewModel.isSoundEnabled ? "Couper le son" : "Activer le son") {
                             viewModel.toggleSound()
+                            pulseSpeakerIcon()
                         }
 
                         Divider()
@@ -72,6 +74,7 @@ struct FocusView: View {
                             Button {
                                 appState.updateSoundscape(sound)
                                 viewModel.setSoundscape(sound)
+                                pulseSpeakerIcon()
                             } label: {
                                 if appState.selectedSoundscape == sound {
                                     Label(sound.title, systemImage: "checkmark")
@@ -83,7 +86,9 @@ struct FocusView: View {
                     } label: {
                         Image(systemName: viewModel.isSoundEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill")
                             .font(.system(size: 20, weight: .semibold))
-                            .foregroundStyle(.white.opacity(0.86))
+                            .foregroundStyle(.white.opacity(speakerPulse ? 1.0 : 0.86))
+                            .scaleEffect(speakerPulse ? 1.12 : 1.0)
+                            .animation(.easeInOut(duration: 0.18), value: speakerPulse)
                     }
 
                     Button {
@@ -128,6 +133,7 @@ struct FocusView: View {
             gestureStartMinutes = totalAccumulatedMinutes
             viewModel.isTickHapticsEnabled = appState.isVibrationsEnabled
             viewModel.setSoundscape(appState.selectedSoundscape)
+            viewModel.prepareAudio()
         }
         .onChange(of: viewModel.selectedMinutes) { _, newValue in
             if previousDragAngle == nil {
@@ -305,12 +311,24 @@ struct FocusView: View {
     }
 
     private func handleScenePhaseChange(_ phase: ScenePhase) {
-        guard phase == .background else { return }
-        guard appState.isStrictFocusModeEnabled else { return }
-        guard viewModel.isRunningActive else { return }
+        switch phase {
+        case .active:
+            viewModel.refreshRemainingFromTargetDate()
+        case .inactive, .background:
+            guard appState.isStrictFocusModeEnabled else { return }
+            guard viewModel.isRunningActive else { return }
+            Task {
+                await StrictFocusNotificationManager.scheduleReminder(remainingSeconds: viewModel.remainingSeconds)
+            }
+        @unknown default:
+            break
+        }
+    }
 
-        Task {
-            await StrictFocusNotificationManager.scheduleReminder(remainingSeconds: viewModel.remainingSeconds)
+    private func pulseSpeakerIcon() {
+        speakerPulse = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            speakerPulse = false
         }
     }
 }
@@ -329,7 +347,7 @@ private enum StrictFocusNotificationManager {
         content.body = "Reviens à FocusFlow. Il reste \(remainingMinutes) minute(s) de session."
         content.sound = .default
 
-        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 8, repeats: false)
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
         let request = UNNotificationRequest(identifier: "focusflow.strict.reminder", content: content, trigger: trigger)
         try? await center.add(request)
     }
