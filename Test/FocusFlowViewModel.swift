@@ -1,6 +1,6 @@
 import Foundation
 import Combine
-import AVFoundation
+
 
 #if canImport(ActivityKit) && os(iOS)
 import ActivityKit
@@ -59,6 +59,7 @@ final class FocusFlowViewModel: ObservableObject {
     @Published private(set) var earnedFocusMinutes: Int = 0
     @Published private(set) var earnedFocusTrigger: Int = 0
     @Published private(set) var liveActivityLastError: String?
+    @Published private(set) var audioLastError: String?
 
     private var completedWorkSessions: Int = 0
     private let shortBreakMinutes = 5
@@ -73,7 +74,9 @@ final class FocusFlowViewModel: ObservableObject {
 
     private var timerCancellable: AnyCancellable?
     private var previousRotationAngle: Double?
-    private let audioEngine = FocusAudioEngine()
+    private lazy var audioEngine = FocusAudioEngine(errorHandler: { [weak self] message in
+        self?.audioLastError = message
+    })
     private var segmentTargetDate: Date?
 
     var totalSeconds: Int {
@@ -157,7 +160,7 @@ final class FocusFlowViewModel: ObservableObject {
 
     func reset() {
         stopTimer()
-        stopSoundIfNeeded()
+        Task { await stopSoundIfNeeded() }
         isPaused = false
         phase = .setting
         currentSegment = .work
@@ -180,12 +183,12 @@ final class FocusFlowViewModel: ObservableObject {
         if isPaused {
             isPaused = false
             segmentTargetDate = Date().addingTimeInterval(TimeInterval(max(remainingSeconds, 0)))
-            startSoundIfNeeded()
+            Task { await startSoundIfNeeded() }
         } else {
             isPaused = true
             syncRemainingSecondsFromTargetDate()
             segmentTargetDate = nil
-            stopSoundIfNeeded()
+            Task { await stopSoundIfNeeded() }
         }
 
         #if canImport(ActivityKit) && os(iOS)
@@ -198,21 +201,21 @@ final class FocusFlowViewModel: ObservableObject {
     func toggleSound() {
         isSoundEnabled.toggle()
         if isSoundEnabled {
-            startSoundIfNeeded()
+            Task { await startSoundIfNeeded() }
         } else {
-            stopSoundIfNeeded()
+            Task { await stopSoundIfNeeded() }
         }
     }
 
     func setSoundscape(_ soundscape: FocusSoundscape) {
         selectedSoundscape = soundscape
         if isSoundEnabled && isRunningActive {
-            audioEngine.transition(to: soundscape)
+            Task { await audioEngine.transition(to: soundscape) }
         }
     }
 
     func prepareAudio() {
-        audioEngine.preloadAll()
+        Task { await audioEngine.preloadAll() }
     }
 
     func refreshRemainingFromTargetDate() {
@@ -274,7 +277,7 @@ final class FocusFlowViewModel: ObservableObject {
         phase = .running
 
         startTimer()
-        startSoundIfNeeded()
+        Task { await startSoundIfNeeded() }
 
         #if canImport(ActivityKit) && os(iOS)
         liveActivityStartTask?.cancel()
@@ -352,13 +355,13 @@ final class FocusFlowViewModel: ObservableObject {
         beginSegment(.work, durationMinutes: selectedMinutes)
     }
 
-    private func startSoundIfNeeded() {
+    private func startSoundIfNeeded() async {
         guard isSoundEnabled, isRunningActive else { return }
-        audioEngine.play(soundscape: selectedSoundscape)
+        await audioEngine.play(soundscape: selectedSoundscape)
     }
 
-    private func stopSoundIfNeeded() {
-        audioEngine.stop()
+    private func stopSoundIfNeeded() async {
+        await audioEngine.stop()
     }
 
     private func minuteFromAngle(_ angle: Double) -> Int {
@@ -437,131 +440,5 @@ final class FocusFlowViewModel: ObservableObject {
 
     deinit {
         timerCancellable?.cancel()
-    }
-}
-@MainActor
-private final class FocusAudioEngine {
-    private var player: AVAudioPlayer?
-    private var currentSoundscape: FocusSoundscape?
-    private var cachedPlayers: [FocusSoundscape: AVAudioPlayer] = [:]
-    private var fadeTask: Task<Void, Never>?
-    private var isSessionConfigured = false
-
-    private let targetVolume: Float = 0.25
-    private let fadeDuration: TimeInterval = 2.0
-
-    func preloadAll() {
-        for soundscape in FocusSoundscape.allCases {
-            _ = playerFor(soundscape)
-        }
-    }
-
-    func play(soundscape: FocusSoundscape) {
-        Task { @MainActor in
-            await configureSessionIfNeeded()
-            await transition(to: soundscape)
-        }
-    }
-
-    func stop() {
-        Task { @MainActor in
-            await fadeOutAndStop()
-        }
-    }
-
-    func transition(to soundscape: FocusSoundscape) {
-        Task { @MainActor in
-            await configureSessionIfNeeded()
-            await transition(to: soundscape)
-        }
-    }
-
-    private func transition(to soundscape: FocusSoundscape) async {
-        if currentSoundscape == soundscape, player?.isPlaying == true {
-            await fade(to: targetVolume, duration: fadeDuration)
-            return
-        }
-
-        await fadeOutAndStop()
-        currentSoundscape = soundscape
-        player = playerFor(soundscape)
-        player?.volume = 0
-        player?.play()
-        await fade(to: targetVolume, duration: fadeDuration)
-    }
-
-    private func fadeOutAndStop() async {
-        await fade(to: 0, duration: fadeDuration)
-        player?.stop()
-        player = nil
-        currentSoundscape = nil
-    }
-
-    private func fade(to volume: Float, duration: TimeInterval) async {
-        fadeTask?.cancel()
-        let task = Task { @MainActor in
-            guard let player else { return }
-            let steps = 20
-            let stepDuration = duration / Double(steps)
-            let startVolume = player.volume
-            for index in 1...steps {
-                if Task.isCancelled { return }
-                let progress = Float(index) / Float(steps)
-                player.volume = startVolume + (volume - startVolume) * progress
-                try? await Task.sleep(nanoseconds: UInt64(stepDuration * 1_000_000_000))
-            }
-        }
-        fadeTask = task
-        await task.value
-    }
-
-    private func playerFor(_ soundscape: FocusSoundscape) -> AVAudioPlayer? {
-        if let cached = cachedPlayers[soundscape] {
-            return cached
-        }
-        guard let url = resourceURL(for: soundscape) else { return nil }
-        do {
-            let player = try AVAudioPlayer(contentsOf: url)
-            player.numberOfLoops = -1
-            player.volume = 0
-            player.prepareToPlay()
-            cachedPlayers[soundscape] = player
-            return player
-        } catch {
-            return nil
-        }
-    }
-
-    private func resourceURL(for soundscape: FocusSoundscape) -> URL? {
-        let candidates: [(name: String, ext: String)]
-
-        switch soundscape {
-        case .cyberRain:
-            candidates = [("cyber_rain", "mp3"), ("cyber_rain", "m4a"), ("cyber_rain", "wav")]
-        case .pureWhiteNoise:
-            candidates = [("white_noise", "mp3"), ("white_noise", "m4a"), ("white_noise", "wav")]
-        case .calmCafe:
-            candidates = [("calm_cafe", "mp3"), ("calm_cafe", "m4a"), ("calm_cafe", "wav")]
-        }
-
-        for candidate in candidates {
-            if let url = Bundle.main.url(forResource: candidate.name, withExtension: candidate.ext) {
-                return url
-            }
-        }
-
-        return nil
-    }
-
-    private func configureSessionIfNeeded() async {
-        guard !isSessionConfigured else { return }
-        let session = AVAudioSession.sharedInstance()
-        do {
-            try session.setCategory(.playback, options: [.duckOthers])
-            try session.setActive(true, options: [])
-            isSessionConfigured = true
-        } catch {
-            isSessionConfigured = false
-        }
     }
 }
